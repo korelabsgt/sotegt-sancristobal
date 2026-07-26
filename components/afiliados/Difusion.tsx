@@ -18,7 +18,6 @@ import {
   UserPlus,
   Globe2,
   Medal,
-  Briefcase,
   Target,
   UserRoundSearch,
   ArrowLeft,
@@ -84,7 +83,7 @@ const GRUPOS_PUBLICO: PublicoGrupo[] = [
     items: [
       {
         value: "Lideres",
-        label: "Líderes",
+        label: "Enlaces",
         icon: Medal,
         theme: {
           border: "border-orange-500",
@@ -94,20 +93,6 @@ const GRUPOS_PUBLICO: PublicoGrupo[] = [
           iconBg:
             "bg-orange-100 dark:bg-orange-950/70 text-orange-600 dark:text-orange-400",
           hover: "hover:border-orange-400 dark:hover:border-orange-600",
-        },
-      },
-      {
-        value: "Empleados",
-        label: "Empleados",
-        icon: Briefcase,
-        theme: {
-          border: "border-violet-500",
-          ring: "ring-violet-500",
-          bg: "bg-violet-50 dark:bg-violet-950/40",
-          text: "text-violet-700 dark:text-violet-300",
-          iconBg:
-            "bg-violet-100 dark:bg-violet-950/70 text-violet-600 dark:text-violet-400",
-          hover: "hover:border-violet-400 dark:hover:border-violet-600",
         },
       },
     ],
@@ -379,6 +364,7 @@ export default function Difusion({
         lideres={usuarios}
         filtros={filtrosMensajes}
         ocultarBarraFiltros
+        puedeEliminar={puedeEnviar}
       />
 
       {puedeEnviar && (

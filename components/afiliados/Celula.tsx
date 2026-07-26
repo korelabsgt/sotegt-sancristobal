@@ -30,7 +30,7 @@ import type { FormatoVista } from "./Tabla";
 function etiquetaRolCelula(lider: Lider): string {
   if (esRolEmpleado(lider.rol)) return "Empleado";
   if (esUsuarioSede(lider)) return "Sede";
-  return "Líder";
+  return "Líder de enlace";
 }
 
 const familiaEase = [0.25, 0.46, 0.45, 0.94] as const;

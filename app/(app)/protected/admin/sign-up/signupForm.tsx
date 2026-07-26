@@ -16,6 +16,12 @@ interface RolDisponible {
   nombre: string;
 }
 
+function etiquetaRolVisible(nombre: string): string {
+  const n = nombre.toUpperCase();
+  if (n === "LIDER" || n === "LÍDER") return "Enlace";
+  return nombre;
+}
+
 export function SignupForm() {
   const router = useRouter();
   const { rol: rolUsuarioSesion } = useUserData();
@@ -102,12 +108,12 @@ export function SignupForm() {
         >
           Volver
         </Button>
-        <h1 className="text-3xl font-semibold">Nuevo Líder</h1>
+        <h1 className="text-3xl font-semibold">Nuevo Enlace</h1>
       </div>
 
       <p className="text-gray-600 dark:text-neutral-400">
-        Registra el acceso para el nuevo Líder. Los datos personales (DPI,
-        Teléfono, etc.) se completarán cuando el líder inicie su grupo.
+        Registra el acceso para el nuevo enlace. Los datos personales (DPI,
+        Teléfono, etc.) se completarán cuando el enlace inicie su grupo.
       </p>
 
       <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
@@ -161,7 +167,7 @@ export function SignupForm() {
             <option value="">-- Seleccione un rol --</option>
             {rolesParaSelector.map((r) => (
               <option key={r.id} value={r.id.toString()}>
-                {r.nombre}
+                {etiquetaRolVisible(r.nombre)}
               </option>
             ))}
           </select>

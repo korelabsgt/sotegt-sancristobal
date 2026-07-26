@@ -187,7 +187,7 @@ export default function Tabla({
                       {index + 1}
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap font-bold text-gray-900 dark:text-gray-100 uppercase">
-                      {esLider ? "Líder: " : ""}
+                      {esLider ? "Líder de enlace: " : ""}
                       {afiliado.nombres} {afiliado.apellidos}
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap font-mono">
@@ -280,7 +280,7 @@ export default function Tabla({
 
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
         {todosOrdenados.map(({ afiliado, depth }, index) => {
           const esLider = !!afiliado.es_lider;
           const esFamiliar = !!afiliado.familiar_de && !esLider;
@@ -289,7 +289,7 @@ export default function Tabla({
           return (
             <div
               key={afiliado.id}
-              className={`group relative border rounded-2xl flex flex-col overflow-visible ${
+              className={`group relative border rounded-2xl flex flex-col overflow-visible min-w-0 ${
                 esLider
                   ? "border-orange-300 dark:border-orange-700 bg-gradient-to-br from-white to-orange-50/40 dark:from-neutral-900 dark:to-orange-950/40 ring-1 ring-orange-200/50 dark:ring-orange-900/50"
                   : esFamiliar
@@ -297,11 +297,10 @@ export default function Tabla({
                     : "border-slate-200 dark:border-neutral-700 bg-gradient-to-br from-white to-slate-50/40 dark:from-neutral-900 dark:to-neutral-800/60 hover:border-blue-300 dark:hover:border-blue-600"
               } ${depth > 0 ? "ml-8 md:ml-12 border-l-4 border-l-purple-500 rounded-l-none" : ""}`}
             >
-              {/* Lider Badge */}
               {esLider && (
                 <div className="absolute -top-2.5 left-3 z-10">
                   <span className="flex items-center gap-1 bg-gradient-to-r from-orange-500 to-amber-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase shadow-sm border border-orange-400">
-                    <Medal className="w-2.5 h-2.5" /> Líder
+                    <Medal className="w-2.5 h-2.5" /> Líder de enlace
                   </span>
                 </div>
               )}
@@ -478,15 +477,12 @@ export default function Tabla({
                 </div>
               </div>
 
-              {/* Acciones */}
               {puedeVerAcciones && (
                 <div
                   className="bg-slate-50/80 dark:bg-neutral-800/80 border-t border-slate-200 dark:border-neutral-700 flex flex-col sm:flex-row sm:items-center sm:justify-between rounded-b-2xl overflow-hidden sm:px-4 sm:py-2"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {/* Primera Línea (Móvil) / Grupo Izquierdo (Desktop) */}
-                  <div className="flex items-center justify-center gap-4 sm:gap-2 px-2 py-2.5 sm:p-0 w-full sm:w-auto">
-                    {/* Ver Familia Button */}
+                  <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-2 px-2 py-2.5 sm:p-0 w-full sm:w-auto">
                     {!esFamiliar && !isFamilyView && onVerFamilia && (
                       <button
                         type="button"
@@ -521,8 +517,8 @@ export default function Tabla({
 
                   {!soloLectura && (
                     <>
-                      <div className="w-full h-px bg-slate-200 dark:bg-neutral-700 sm:hidden"></div>
-                      <div className="flex items-center justify-center gap-4 sm:gap-2 px-2 py-2.5 sm:p-0 w-full sm:w-auto">
+                      <div className="w-full h-px bg-slate-200 dark:bg-neutral-700 sm:hidden" />
+                      <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-2 px-2 py-2.5 sm:p-0 w-full sm:w-auto">
                         <button
                           type="button"
                           className="inline-flex items-center justify-center rounded-lg px-3 py-1.5 gap-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-neutral-700 hover:text-slate-900 dark:hover:text-white text-xs font-black uppercase transition-colors"
@@ -536,7 +532,7 @@ export default function Tabla({
                           disabled={!puedeEliminar}
                           title={
                             !puedeEliminar
-                              ? "No se puede eliminar al líder mientras tenga integrantes"
+                              ? "No se puede eliminar al enlace mientras tenga integrantes"
                               : undefined
                           }
                           className="inline-flex items-center justify-center rounded-lg px-3 py-1.5 gap-1.5 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/50 hover:text-red-900 dark:hover:text-red-300 text-xs font-black uppercase transition-colors disabled:opacity-40"

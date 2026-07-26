@@ -2,12 +2,15 @@
 
 import { useState, Fragment, useMemo, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { useQuery } from "@tanstack/react-query";
-import { obtenerHistorialMensajesAction } from "../dashboard/actions/mensajes";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { obtenerHistorialMensajesAction, eliminarMensajeAction } from "../dashboard/actions/mensajes";
 import { Dialog, Transition, TransitionChild, DialogPanel } from "@headlessui/react";
-import { X, CheckCircle2, Clock, ChevronLeft, ChevronRight, ChevronDown, Calendar, Check } from "lucide-react";
+import { X, CheckCircle2, Clock, ChevronLeft, ChevronRight, ChevronDown, Calendar, Check, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import Swal from "@/lib/swal";
+import { swalThemeOptions } from "@/lib/swalTheme";
+import { toast } from "@/lib/toast";
 
 const MESES_CORTOS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 const MESES_LARGOS = [
@@ -405,10 +408,12 @@ export default function MensajesEnviados({
   lideres,
   filtros,
   ocultarBarraFiltros = false,
+  puedeEliminar = false,
 }: {
   lideres: any[];
   filtros?: MensajesFiltrosApi;
   ocultarBarraFiltros?: boolean;
+  puedeEliminar?: boolean;
 }) {
   if (filtros) {
     return (
@@ -416,19 +421,28 @@ export default function MensajesEnviados({
         lideres={lideres}
         filtros={filtros}
         ocultarBarraFiltros={ocultarBarraFiltros}
+        puedeEliminar={puedeEliminar}
       />
     );
   }
 
-  return <MensajesEnviadosConFiltros lideres={lideres} ocultarBarraFiltros={ocultarBarraFiltros} />;
+  return (
+    <MensajesEnviadosConFiltros
+      lideres={lideres}
+      ocultarBarraFiltros={ocultarBarraFiltros}
+      puedeEliminar={puedeEliminar}
+    />
+  );
 }
 
 function MensajesEnviadosConFiltros({
   lideres,
   ocultarBarraFiltros,
+  puedeEliminar,
 }: {
   lideres: any[];
   ocultarBarraFiltros: boolean;
+  puedeEliminar: boolean;
 }) {
   const filtros = useMensajesFiltros();
   return (
@@ -436,6 +450,7 @@ function MensajesEnviadosConFiltros({
       lideres={lideres}
       filtros={filtros}
       ocultarBarraFiltros={ocultarBarraFiltros}
+      puedeEliminar={puedeEliminar}
     />
   );
 }
@@ -444,10 +459,12 @@ function MensajesEnviadosLista({
   lideres,
   filtros,
   ocultarBarraFiltros = false,
+  puedeEliminar = false,
 }: {
   lideres: any[];
   filtros: MensajesFiltrosApi;
   ocultarBarraFiltros?: boolean;
+  puedeEliminar?: boolean;
 }) {
   const {
     anioMes,
@@ -458,6 +475,8 @@ function MensajesEnviadosLista({
   const [mensajeSeleccionado, setMensajeSeleccionado] = useState<any | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(10);
+  const [eliminandoId, setEliminandoId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const { data: mensajes = [], isLoading } = useQuery({
     queryKey: ["historial-mensajes"],
@@ -514,6 +533,47 @@ function MensajesEnviadosLista({
     return formateada;
   };
 
+  const confirmarEliminar = async (m: { id: string; mensaje: string }) => {
+    const preview =
+      m.mensaje.length > 80 ? `${m.mensaje.slice(0, 80)}…` : m.mensaje;
+    const isDark =
+      typeof document !== "undefined" &&
+      document.documentElement.classList.contains("dark");
+
+    const confirmacion = await Swal.fire({
+      ...swalThemeOptions({
+        confirmButtonClass: isDark ? "swal-btn-outline-red" : "swal-btn-outline-red-light",
+        cancelButtonClass: isDark ? "swal-btn-outline-blue" : "swal-btn-outline-blue-light",
+      }),
+      title: "¿Eliminar mensaje?",
+      text: `Se eliminará permanentemente: "${preview}"`,
+      icon: "warning",
+      showCancelButton: true,
+      reverseButtons: true,
+      confirmButtonText: "Sí, eliminar",
+      cancelButtonText: "Cancelar",
+    });
+
+    if (!confirmacion.isConfirmed) return;
+
+    setEliminandoId(m.id);
+    const result = await eliminarMensajeAction(m.id);
+    setEliminandoId(null);
+
+    if (result.error) {
+      toast.error(result.error);
+      return;
+    }
+
+    toast.success(result.success || "Mensaje eliminado.");
+    if (mensajeSeleccionado?.id === m.id) {
+      setMensajeSeleccionado(null);
+    }
+    queryClient.invalidateQueries({ queryKey: ["historial-mensajes"] });
+  };
+
+  const colSpan = puedeEliminar ? 7 : 6;
+
   return (
     <div className={`w-full ${ocultarBarraFiltros ? "" : "mt-6"}`}>
       {!ocultarBarraFiltros && (
@@ -545,6 +605,11 @@ function MensajesEnviadosLista({
                 <th className="px-4 py-3 text-left text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider w-24">
                   Vistas
                 </th>
+                {puedeEliminar && (
+                  <th className="px-4 py-3 text-center text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider w-16">
+                    Acciones
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-neutral-900 divide-y divide-gray-200 dark:divide-neutral-700">
@@ -557,11 +622,14 @@ function MensajesEnviadosLista({
                     <td className="px-4 py-3"><div className="h-4 w-full max-w-xs bg-gray-200 dark:bg-neutral-700 rounded" /></td>
                     <td className="px-4 py-3"><div className="h-5 w-20 bg-gray-200 dark:bg-neutral-700 rounded-md" /></td>
                     <td className="px-4 py-3"><div className="h-4 w-12 bg-gray-200 dark:bg-neutral-700 rounded" /></td>
+                    {puedeEliminar && (
+                      <td className="px-4 py-3"><div className="h-8 w-8 bg-gray-200 dark:bg-neutral-700 rounded mx-auto" /></td>
+                    )}
                   </tr>
                 ))
               ) : mensajesFiltrados.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-gray-500 dark:text-neutral-400 font-semibold">
+                  <td colSpan={colSpan} className="px-4 py-10 text-center text-gray-500 dark:text-neutral-400 font-semibold">
                     {mensajes.length === 0
                       ? "No hay mensajes enviados."
                       : "No hay mensajes en este periodo."}
@@ -605,6 +673,22 @@ function MensajesEnviadosLista({
                         {m.sis_mensajes_lecturas?.length || 0}
                       </span>
                     </td>
+                    {puedeEliminar && (
+                      <td className="px-4 py-3 whitespace-nowrap text-center">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void confirmarEliminar(m);
+                          }}
+                          disabled={eliminandoId === m.id}
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors disabled:opacity-50"
+                          aria-label="Eliminar mensaje"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}

@@ -2,22 +2,20 @@
 
 import { Building2 } from "lucide-react";
 import { motion } from "framer-motion";
-import { PiBriefcaseDuotone, PiMedalDuotone } from "react-icons/pi";
+import { PiMedalDuotone } from "react-icons/pi";
 
 interface Props {
   totalSede: number;
   totalLideres: number;
-  totalTrabajadores: number;
   objetivoTotal?: number;
 }
 
 export default function MetaGeneral({
   totalSede,
   totalLideres,
-  totalTrabajadores,
   objetivoTotal = 0,
 }: Props) {
-  const total = totalSede + totalLideres + totalTrabajadores;
+  const total = totalSede + totalLideres;
   const objetivo = objetivoTotal > 0 ? objetivoTotal : 0;
   const pct = (n: number) =>
     objetivo > 0 ? Math.min((n / objetivo) * 100, 100) : 0;
@@ -50,12 +48,6 @@ export default function MetaGeneral({
           transition={{ duration: 1, ease: "easeOut", delay: 0.1 }}
           className="bg-orange-500 h-full shrink-0"
         />
-        <motion.div
-          initial={{ width: 0 }}
-          animate={{ width: `${pct(totalTrabajadores)}%` }}
-          transition={{ duration: 1, ease: "easeOut", delay: 0.15 }}
-          className="bg-violet-500 h-full shrink-0"
-        />
       </div>
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs md:text-sm font-bold uppercase">
         <span className="flex items-center gap-1.5 text-blue-700 dark:text-blue-400">
@@ -64,11 +56,7 @@ export default function MetaGeneral({
         </span>
         <span className="flex items-center gap-1.5 text-orange-600 dark:text-orange-400">
           <PiMedalDuotone className="h-4 w-4 shrink-0" />
-          Líderes: {totalLideres.toLocaleString()}
-        </span>
-        <span className="flex items-center gap-1.5 text-violet-600 dark:text-violet-400">
-          <PiBriefcaseDuotone className="h-4 w-4 shrink-0" />
-          Empleados: {totalTrabajadores.toLocaleString()}
+          Enlaces: {totalLideres.toLocaleString()}
         </span>
         <span className="font-black text-gray-900 dark:text-gray-100 normal-case md:ml-auto">
           Total: {total.toLocaleString()}

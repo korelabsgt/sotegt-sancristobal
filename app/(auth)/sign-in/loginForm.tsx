@@ -1,14 +1,14 @@
 "use client";
 
-import { useState, useRef, useEffect, useTransition } from "react";
 import { signInAction } from "@/app/actions/usuarios";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Eye, EyeOff } from "lucide-react";
 import { motion } from "framer-motion";
+import { Eye, EyeOff } from "lucide-react";
 import Image from "next/image";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Typewriter } from "react-simple-typewriter";
-import { Button } from "@/components/ui/button";
 import Swal from "sweetalert2";
 
 function PendingSignInButton({ isPending }: { isPending: boolean }) {
@@ -35,7 +35,11 @@ export function LoginForm() {
 
   function traducirError(mensaje: string) {
     const mensajeLower = mensaje.toLowerCase();
-    if (mensajeLower.includes("fetch") || mensajeLower.includes("conn") || mensajeLower.includes("network")) {
+    if (
+      mensajeLower.includes("fetch") ||
+      mensajeLower.includes("conn") ||
+      mensajeLower.includes("network")
+    ) {
       return "Revisa tu conexión a Internet, si el problema persiste contacta soporte técnico.";
     }
     const errores: Record<string, string> = {
@@ -123,7 +127,7 @@ export function LoginForm() {
           transition={{
             duration: 1,
             delay: 0.4,
-            ease: [0.16, 1, 0.3, 1]
+            ease: [0.16, 1, 0.3, 1],
           }}
         >
           <h1
@@ -142,11 +146,9 @@ export function LoginForm() {
         className="flex flex-col items-center mb-8 w-full text-center"
       >
         <h2 className="text-2xl md:text-4xl font-bold leading-tight bg-gradient-to-r from-blue-800 via-blue-400 to-blue-800 dark:from-blue-400 dark:via-blue-300 dark:to-blue-500 bg-[length:200%_auto] text-transparent bg-clip-text animate-text-shine">
-          Pachalum, Quiché
+          San Cristóbal
         </h2>
-
       </motion.div>
-
 
       <form
         ref={formRef}

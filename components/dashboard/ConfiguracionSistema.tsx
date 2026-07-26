@@ -974,7 +974,7 @@ export default function ConfiguracionSistema({
                               currentConfig.objetivo_total /
                                 currentConfig.meta_por_lider,
                             )}{" "}
-                            líderes
+                            enlaces
                           </span>{" "}
                           para la meta
                         </p>

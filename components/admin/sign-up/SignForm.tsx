@@ -52,7 +52,7 @@ function estiloRol(nombreRaw: string): RolVisual {
   const nombre = nombreRaw.toUpperCase();
   if (nombre === "LIDER" || nombre === "LÍDER") {
     return {
-      label: "Líder",
+      label: "Enlace",
       Icon: PiMedalDuotone,
       text: "text-orange-600 dark:text-orange-400",
       border: "border-orange-400 dark:border-orange-500",
@@ -302,13 +302,13 @@ export function SignupForm({
         ? "Nuevo Usuario Admin"
         : rolInicial === "SUPER"
           ? "Nuevo Usuario Super"
-          : "Nuevo Usuario Líder";
+          : "Nuevo Usuario Enlace";
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (modoSimulacion) {
-      toast.info("Modo simulación: el usuario líder no se creó realmente.");
+      toast.info("Modo simulación: el enlace no se creó realmente.");
       onSuccess();
       return;
     }

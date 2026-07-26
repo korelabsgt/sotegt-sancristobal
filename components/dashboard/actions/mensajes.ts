@@ -338,3 +338,48 @@ export async function obtenerHistorialMensajesAction() {
 
   return lista;
 }
+
+function esRolAdminDifusion(rol: string): boolean {
+  const r = rol.toUpperCase();
+  return r === "ADMIN" || r === "SUPER" || r === "ADMINISTRADOR";
+}
+
+export async function eliminarMensajeAction(mensajeId: string) {
+  if (!mensajeId) {
+    return { error: "ID de mensaje no proporcionado." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "No autenticado." };
+  }
+
+  const rol = await obtenerRolUsuario(supabase, user.id);
+  if (!esRolAdminDifusion(rol)) {
+    return { error: "No autorizado para eliminar mensajes." };
+  }
+
+  const { error: errorLecturas } = await supabaseAdmin
+    .from("sis_mensajes_lecturas")
+    .delete()
+    .eq("mensaje_id", mensajeId);
+
+  if (errorLecturas) {
+    return { error: errorLecturas.message };
+  }
+
+  const { error } = await supabaseAdmin
+    .from("sis_mensajes")
+    .delete()
+    .eq("id", mensajeId);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  return { success: "Mensaje eliminado correctamente." };
+}

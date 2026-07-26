@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Building2,
-  Briefcase,
   Download,
   Medal,
   Users,
@@ -12,7 +11,7 @@ import {
 import { AnimatePresence, motion } from "framer-motion";
 import * as XLSX from "xlsx";
 import type { Afiliado, Lider } from "./esquemas";
-import { esUsuarioSede } from "./esquemas";
+import { esRolEmpleado, esUsuarioSede } from "./esquemas";
 import { formatearDpi, TelefonoInline } from "./contacto";
 import { etiquetaEdadNacimiento } from "./fechaNacimiento";
 import { Button } from "@/components/ui/button";
@@ -26,7 +25,7 @@ interface Props {
   isLoading?: boolean;
 }
 
-type GrupoTipo = "todos" | "sede" | "lider" | "trabajador";
+type GrupoTipo = "todos" | "sede" | "lider";
 
 type GrupoAfiliados = {
   lider: Lider;
@@ -62,39 +61,23 @@ const CATEGORIAS: Array<{
   },
   {
     tipo: "lider",
-    titulo: "Líderes",
+    titulo: "Enlaces",
     icon: Medal,
     active:
       "bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-200/50 dark:shadow-none",
     idle: "bg-white dark:bg-neutral-900 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800 hover:bg-orange-50 dark:hover:bg-orange-950/40",
     rowActive: "bg-orange-50 dark:bg-orange-950/30",
   },
-  {
-    tipo: "trabajador",
-    titulo: "Empleado",
-    icon: Briefcase,
-    active:
-      "bg-violet-600 text-white border-violet-600 shadow-md shadow-violet-200/50 dark:shadow-none",
-    idle: "bg-white dark:bg-neutral-900 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-800 hover:bg-violet-50 dark:hover:bg-violet-950/40",
-    rowActive: "bg-violet-50 dark:bg-violet-950/30",
-  },
 ];
-
-function esRolEmpleado(rol: string | null | undefined) {
-  const r = (rol || "").toUpperCase();
-  return r === "EMPLEADO" || r === "TRABAJADOR";
-}
 
 function tipoDeLider(lider: Lider): Exclude<GrupoTipo, "todos"> {
   if (esUsuarioSede(lider)) return "sede";
-  if (esRolEmpleado(lider.rol)) return "trabajador";
   return "lider";
 }
 
 function etiquetaGrupo(tipo: Exclude<GrupoTipo, "todos">) {
   if (tipo === "sede") return "Sede";
-  if (tipo === "trabajador") return "Empleado";
-  return "Líder";
+  return "Líder de enlace";
 }
 
 function normalizarNombre(texto: string) {
@@ -127,7 +110,7 @@ function filaExcel(
     Ubicación: afiliado.lugar_nombre || "",
     Empadronado: afiliado.empadronado ? "Sí" : "No",
     "No. Padrón": afiliado.no_padron || "",
-    Líder: liderNombre,
+    "Líder de enlace": liderNombre,
     Grupo: grupo,
   };
 }
@@ -183,19 +166,13 @@ export default function AfiliadosGeneral({
       const tipo = tipoDeLider(lider);
       const rol = (lider.rol || "").toUpperCase();
 
+      if (esRolEmpleado(rol)) return;
+
       if (tipo === "sede") {
         result.push({
           lider,
           afiliados: grouped.get(lider.id) || [],
           tipo: "sede",
-        });
-        return;
-      }
-      if (esRolEmpleado(rol)) {
-        result.push({
-          lider,
-          afiliados: grouped.get(lider.id) || [],
-          tipo: "trabajador",
         });
         return;
       }
@@ -221,7 +198,6 @@ export default function AfiliadosGeneral({
       todos: 0,
       sede: 0,
       lider: 0,
-      trabajador: 0,
     };
     grupos.forEach((g) => {
       map[g.tipo] += g.afiliados.length;
@@ -275,7 +251,6 @@ export default function AfiliadosGeneral({
     const porTipo = {
       sede: [] as ReturnType<typeof filaExcel>[],
       lider: [] as ReturnType<typeof filaExcel>[],
-      trabajador: [] as ReturnType<typeof filaExcel>[],
     };
 
     grupos.forEach((g) => {
@@ -292,7 +267,7 @@ export default function AfiliadosGeneral({
       });
     });
 
-    const todos = [...porTipo.sede, ...porTipo.lider, ...porTipo.trabajador].sort(
+    const todos = [...porTipo.sede, ...porTipo.lider].sort(
       (a, b) => compararNombres(a.Nombre, b.Nombre),
     );
 
@@ -310,12 +285,7 @@ export default function AfiliadosGeneral({
     XLSX.utils.book_append_sheet(
       wb,
       XLSX.utils.json_to_sheet(porTipo.lider),
-      "Lideres",
-    );
-    XLSX.utils.book_append_sheet(
-      wb,
-      XLSX.utils.json_to_sheet(porTipo.trabajador),
-      "Empleados",
+      "Enlaces",
     );
 
     const fecha = new Date().toISOString().slice(0, 10);
@@ -416,7 +386,7 @@ export default function AfiliadosGeneral({
                       Ubicación
                     </th>
                     <th className="px-4 py-2 text-left font-bold text-gray-600 dark:text-gray-300 uppercase">
-                      Líder
+                      Líder de enlace
                     </th>
                     <th className="px-4 py-2 text-left font-bold text-gray-600 dark:text-gray-300 uppercase">
                       Grupo

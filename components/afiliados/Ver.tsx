@@ -20,7 +20,6 @@ import {
   useState,
 } from "react";
 import {
-  PiBriefcaseDuotone,
   PiBuildingsDuotone,
   PiChatCircleDotsDuotone,
   PiClipboardTextDuotone,
@@ -48,7 +47,7 @@ import MetaGeneral from "./MetaGeneral";
 import ModalBienvenida from "./ModalBienvenida";
 import Padron from "./Padron";
 import type { Afiliado, Lider } from "./esquemas";
-import { esRolEmpleado, esUsuarioSede } from "./esquemas";
+import { esUsuarioSede } from "./esquemas";
 import Form from "./forms/afiliados/Afiliados";
 import ReporteLideresClasificacion from "./reportes/ReporteLideresClasificacion";
 import { eliminar } from "./acciones";
@@ -68,7 +67,6 @@ type Tab =
   | "Sede"
   | "Lideres"
   | "Afiliados"
-  | "Trabajadores"
   | "Padron"
   | "Administrativos"
   | "Mensajes";
@@ -102,12 +100,6 @@ const TAB_THEMES: Record<
     activeIconText: "text-sky-600 dark:text-sky-400",
     lineBg: "bg-sky-500 dark:bg-sky-400",
   },
-  Trabajadores: {
-    activeText: "text-violet-600 dark:text-violet-400",
-    activeIconBg: "bg-violet-100 dark:bg-violet-950/60",
-    activeIconText: "text-violet-600 dark:text-violet-400",
-    lineBg: "bg-violet-500 dark:bg-violet-400",
-  },
   Padron: {
     activeText: "text-teal-700 dark:text-teal-400",
     activeIconBg: "bg-teal-100 dark:bg-teal-950/60",
@@ -133,7 +125,6 @@ const tabEase = [0.25, 0.46, 0.45, 0.94] as const;
 const TAB_ORDER: Tab[] = [
   "Sede",
   "Lideres",
-  "Trabajadores",
   "Afiliados",
   "Padron",
   "Administrativos",
@@ -295,11 +286,6 @@ export default function Ver() {
   const administrativos = allUsers.filter((u) =>
     rolesAdmin.includes((u.rol || "").toUpperCase()),
   );
-  const trabajadores = allUsers.filter((u) => esRolEmpleado(u.rol));
-  const totalAfiliadosTrabajadores = trabajadores.reduce(
-    (acc, u) => acc + (u.conteoAfiliados || 0),
-    0,
-  );
   const sedeUsuario =
     allUsers.find((u) => esUsuarioSede(u)) ||
     (esSedeSesion && miPerfilGlobal ? miPerfilGlobal : null);
@@ -334,10 +320,8 @@ export default function Ver() {
     : lideresVisibles.filter((l) => l.id === userId);
 
   const totalLideresRegistrados = lideresBase.length;
-  const totalEmpleadosRegistrados = trabajadores.length;
   const totalAdministrativosRegistrados = administrativos.length;
-  const totalMiembrosGeneral =
-    totalAfiliadosSede + totalAfiliadosLideres + totalAfiliadosTrabajadores;
+  const totalMiembrosGeneral = totalAfiliadosSede + totalAfiliadosLideres;
 
   const cargandoLideres = isDashboardLoading;
   const cargandoMiembros = isLoadingAfiliados || cargandoLideres;
@@ -543,7 +527,6 @@ export default function Ver() {
             <MetaGeneral
               totalSede={totalAfiliadosSede}
               totalLideres={totalAfiliadosLideres}
-              totalTrabajadores={totalAfiliadosTrabajadores}
               objetivoTotal={configSis?.objetivo_total || 0}
             />
             {miPerfilGlobal ? (
@@ -567,7 +550,6 @@ export default function Ver() {
             <MetaGeneral
               totalSede={totalAfiliadosSede}
               totalLideres={totalAfiliadosLideres}
-              totalTrabajadores={totalAfiliadosTrabajadores}
               objetivoTotal={configSis?.objetivo_total || 0}
             />
             <div className="mb-6 w-full min-w-0 bg-white dark:bg-neutral-950">
@@ -583,16 +565,9 @@ export default function Ver() {
                     },
                     {
                       id: "Lideres" as Tab,
-                      label: "Líderes",
+                      label: "Enlaces",
                       count: totalLideresRegistrados,
                       icon: PiMedalDuotone,
-                      show: true,
-                    },
-                    {
-                      id: "Trabajadores" as Tab,
-                      label: "Empleados",
-                      count: totalEmpleadosRegistrados,
-                      icon: PiBriefcaseDuotone,
                       show: true,
                     },
                     {
@@ -778,7 +753,7 @@ export default function Ver() {
                             </p>
                             <p className="text-xs text-blue-800/80 dark:text-blue-300/80 mt-0.5">
                               Créalo para afiliar desde sede y diferenciarlo del
-                              avance de los líderes.
+                              avance de los enlaces.
                             </p>
                           </div>
                         </div>
@@ -808,7 +783,7 @@ export default function Ver() {
                             className="gap-1.5 h-10 px-3 text-sm font-semibold border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/40 hover:bg-orange-100 dark:hover:bg-orange-950/60 shadow-sm w-full sm:w-auto"
                           >
                             <PiMedalDuotone className="w-4 h-4 shrink-0" />
-                            Nuevo Líder
+                            Nuevo Enlace
                           </Button>
                         ) : undefined,
                       )}
@@ -834,35 +809,6 @@ export default function Ver() {
                         onDataChange={refreshAfterDeletion}
                         searchTerm={searchTerm}
                         isLoading={cargandoMiembros}
-                      />
-                    </>
-                  )}
-                  {activeTab === "Trabajadores" && (
-                    <>
-                      {renderBarraPestana(
-                        puedeVerBotonNuevo ? (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() =>
-                              handleOpenCreateUsuarioModal("EMPLEADO")
-                            }
-                            className="gap-1.5 h-10 px-3 text-sm font-semibold border-violet-500 text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/40 hover:bg-violet-100 dark:hover:bg-violet-950/60 shadow-sm w-full sm:w-auto"
-                          >
-                            <PiBriefcaseDuotone className="w-4 h-4 shrink-0" />
-                            Nuevo Empleado
-                          </Button>
-                        ) : undefined,
-                      )}
-                      <Lideres
-                        lideres={trabajadores}
-                        onVerCelula={handleOpenCelula}
-                        onEditar={handleOpenEditLiderModal}
-                        rolUsuarioSesion={rolSesionCelula}
-                        onDataChange={refreshAfterDeletion}
-                        searchTerm={searchTerm}
-                        idUsuarioSesion={userId}
-                        isLoading={cargandoLideres}
                       />
                     </>
                   )}

@@ -1,6 +1,16 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
+import { obtenerConfiguracionAction } from "../../dashboard/actions/configuracion";
+import {
+  calcularNivelCompromiso,
+  type NivelCompromisoLabel,
+} from "@/lib/nivelCompromiso";
+import {
+  useChartTheme,
+} from "../estadisticas/useChartTheme";
 import {
   Dialog,
   DialogPanel,
@@ -44,30 +54,209 @@ type Props = {
   mostrarOpcionSimular: boolean;
 };
 
-const ORDEN_NIVEL = (n: string | null | undefined): number => {
-  const v = String(n ?? "").toLowerCase();
-  if (v === "alto") return 0;
-  if (v === "medio") return 1;
-  if (v === "bajo") return 2;
+const NIVELES_TABLA = ["Bajo", "Medio", "Cumple", "Alto"] as const;
+type NivelTabla = NivelCompromisoLabel;
+
+type LiderReporte = Lider & { nivelCalculado: NivelTabla };
+
+const ORDEN_NIVEL_TABLA = (n: NivelTabla): number => {
+  if (n === "Alto") return 0;
+  if (n === "Cumple") return 1;
+  if (n === "Medio") return 2;
   return 3;
 };
 
-const ETIQUETA_NIVEL = (n: string | null | undefined): string => {
-  const v = String(n ?? "").toLowerCase();
-  if (v === "alto" || v === "medio" || v === "bajo")
-    return v.charAt(0).toUpperCase() + v.slice(1);
-  return "Sin calificar";
-};
+function calcularNivelReporte(
+  lider: Lider,
+  metaCelula: number,
+  metaMinima: number,
+): NivelTabla {
+  const total = lider.conteoAfiliados ?? 0;
+  return calcularNivelCompromiso(
+    total,
+    metaCelula,
+    metaMinima,
+    lider.nombres,
+  ).nivel;
+}
 
-const COLORS_BAR: Record<string, string> = {
+const COLORS_BAR: Record<NivelTabla, string> = {
   Alto: "#15803d",
-  Medio: "#ea580c",
+  Cumple: "#2563eb",
+  Medio: "#ca8a04",
   Bajo: "#b91c1c",
-  "Sin calificar": "#6b7280",
 };
 
-const NIVELES_TABLA = ["Alto", "Medio", "Bajo", "Sin calificar"] as const;
-type NivelTabla = (typeof NIVELES_TABLA)[number];
+type DonaSlice = { name: string; value: number; fill: string };
+
+function CentroDona({ activo }: { activo: DonaSlice | null }) {
+  return (
+    <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+      <AnimatePresence mode="wait">
+        {activo ? (
+          <motion.div
+            key={`${activo.name}-${activo.value}`}
+            initial={{ opacity: 0, scale: 0.88 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.92 }}
+            transition={{ duration: 0.22, ease: [0.33, 1, 0.68, 1] }}
+            className="flex max-w-[72%] flex-col items-center gap-1 text-center"
+          >
+            <span
+              className="text-[10px] font-black uppercase leading-tight tracking-wider md:text-xs"
+              style={{ color: activo.fill }}
+            >
+              {activo.name}
+            </span>
+            <span className="text-3xl font-black tabular-nums text-slate-900 dark:text-gray-100 md:text-4xl">
+              {activo.value}
+            </span>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+type DonaInteractivaProps = {
+  data: DonaSlice[];
+  stroke: string;
+  vacio?: string;
+  className?: string;
+};
+
+function DonaInteractiva({
+  data,
+  stroke,
+  vacio = "Sin datos para graficar.",
+  className = "h-64 w-full md:h-72",
+}: DonaInteractivaProps) {
+  const [activo, setActivo] = useState<DonaSlice | null>(null);
+
+  if (data.length === 0) {
+    return (
+      <p
+        className={`flex items-center justify-center text-sm text-slate-500 dark:text-gray-400 ${className}`}
+      >
+        {vacio}
+      </p>
+    );
+  }
+
+  return (
+    <div className={`relative ${className}`}>
+      <ResponsiveContainer width="100%" height="100%">
+        <PieChart margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+          <Pie
+            data={data}
+            dataKey="value"
+            nameKey="name"
+            cx="50%"
+            cy="50%"
+            innerRadius="52%"
+            outerRadius="80%"
+            stroke={stroke}
+            strokeWidth={3}
+            paddingAngle={data.length > 1 ? 2 : 0}
+            onMouseEnter={(_, index) => {
+              const slice = data[index];
+              if (slice) setActivo(slice);
+            }}
+            onMouseLeave={() => setActivo(null)}
+          >
+            {data.map((e) => (
+              <Cell key={e.name} fill={e.fill} />
+            ))}
+          </Pie>
+        </PieChart>
+      </ResponsiveContainer>
+      <CentroDona activo={activo} />
+    </div>
+  );
+}
+
+type TooltipBarraPayload = {
+  name?: string;
+  value?: number;
+  color?: string;
+  fill?: string;
+};
+
+type TooltipBarraReporteProps = {
+  active?: boolean;
+  payload?: TooltipBarraPayload[];
+  label?: string | number;
+};
+
+function TooltipBarraReporte({
+  active,
+  payload,
+  label,
+}: TooltipBarraReporteProps) {
+  if (!active || !payload?.length) return null;
+  const etiqueta = label != null && String(label).length > 0 ? String(label) : null;
+  return (
+    <div className="rounded-xl border border-slate-200/80 bg-white/95 px-3 py-2.5 shadow-lg backdrop-blur-sm dark:border-neutral-600/80 dark:bg-neutral-900/95">
+      {etiqueta ? (
+        <p className="mb-1.5 max-w-[220px] truncate text-[10px] font-black uppercase tracking-wide text-slate-500 dark:text-gray-400">
+          {etiqueta}
+        </p>
+      ) : null}
+      <div className="flex flex-col gap-1">
+        {payload.map((entry) => {
+          const color = entry.color ?? entry.fill ?? "#64748b";
+          return (
+            <div
+              key={entry.name}
+              className="flex items-center justify-between gap-4"
+            >
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-gray-300">
+                <span
+                  className="h-2 w-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: color }}
+                />
+                {entry.name}
+              </span>
+              <span className="text-sm font-black tabular-nums text-slate-900 dark:text-gray-100">
+                {entry.value ?? 0}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+type TooltipBarraSimpleProps = {
+  active?: boolean;
+  payload?: TooltipBarraPayload[];
+  label?: string | number;
+};
+
+function TooltipBarraSimple({
+  active,
+  payload,
+  label,
+}: TooltipBarraSimpleProps) {
+  if (!active || !payload?.length) return null;
+  const entry = payload[0];
+  const color = entry.color ?? entry.fill ?? "#64748b";
+  const nombre = String(label ?? entry.name ?? "");
+  return (
+    <div className="rounded-xl border border-slate-200/80 bg-white/95 px-3 py-2 shadow-lg backdrop-blur-sm dark:border-neutral-600/80 dark:bg-neutral-900/95">
+      <p
+        className="text-[10px] font-black uppercase tracking-wide"
+        style={{ color }}
+      >
+        {nombre}
+      </p>
+      <p className="mt-0.5 text-xl font-black tabular-nums text-slate-900 dark:text-gray-100">
+        {entry.value ?? 0}
+      </p>
+    </div>
+  );
+}
 
 const PAGE_SIZE_DETALLE = 10;
 
@@ -521,6 +710,17 @@ export default function ReporteLideresClasificacion({
   const [modoTerritorio, setModoTerritorio] =
     useState<ModoTerritorioReporte>("todos");
   const vistaBarrasMovil = useBarrasViewportEstrecho();
+  const chartTheme = useChartTheme();
+
+  const { data: config } = useQuery({
+    queryKey: ["config_sistema"],
+    queryFn: () => obtenerConfiguracionAction(),
+    staleTime: 5 * 60 * 1000,
+    refetchOnMount: false,
+  });
+
+  const META_CELULA = config?.meta_por_lider ?? config?.meta_celula ?? 15;
+  const META_MINIMA = config?.meta_celula_minima ?? 10;
 
   useEffect(() => {
     if (!open) {
@@ -546,23 +746,30 @@ export default function ReporteLideresClasificacion({
     [simulacionDatosActivada, lideres],
   );
 
+  const lideresConNivel = useMemo((): LiderReporte[] => {
+    return datosEfectivos.map((l) => ({
+      ...l,
+      nivelCalculado: calcularNivelReporte(l, META_CELULA, META_MINIMA),
+    }));
+  }, [datosEfectivos, META_CELULA, META_MINIMA]);
+
   const ordenados = useMemo(() => {
-    return [...datosEfectivos].sort((a, b) => {
+    return [...lideresConNivel].sort((a, b) => {
       const d =
-        ORDEN_NIVEL(a.nivel_compromiso) - ORDEN_NIVEL(b.nivel_compromiso);
+        ORDEN_NIVEL_TABLA(a.nivelCalculado) -
+        ORDEN_NIVEL_TABLA(b.nivelCalculado);
       if (d !== 0) return d;
       const na = `${a.nombres} ${a.apellidos}`.toLowerCase();
       const nb = `${b.nombres} ${b.apellidos}`.toLowerCase();
       return na.localeCompare(nb, "es");
     });
-  }, [datosEfectivos]);
+  }, [lideresConNivel]);
 
   const ordenadosFiltrados = useMemo(() => {
     if (filtroDetalleNiveles === null) return ordenados;
-    return ordenados.filter((row) => {
-      const label = ETIQUETA_NIVEL(row.nivel_compromiso) as NivelTabla;
-      return filtroDetalleNiveles.has(label);
-    });
+    return ordenados.filter((row) =>
+      filtroDetalleNiveles.has(row.nivelCalculado),
+    );
   }, [ordenados, filtroDetalleNiveles]);
 
   useEffect(() => {
@@ -574,12 +781,11 @@ export default function ReporteLideresClasificacion({
   }, [ordenadosFiltrados.length]);
 
   const lideresEnVista = useMemo(() => {
-    if (filtroDetalleNiveles === null) return datosEfectivos;
-    return datosEfectivos.filter((row) => {
-      const label = ETIQUETA_NIVEL(row.nivel_compromiso) as NivelTabla;
-      return filtroDetalleNiveles.has(label);
-    });
-  }, [datosEfectivos, filtroDetalleNiveles]);
+    if (filtroDetalleNiveles === null) return lideresConNivel;
+    return lideresConNivel.filter((row) =>
+      filtroDetalleNiveles.has(row.nivelCalculado),
+    );
+  }, [lideresConNivel, filtroDetalleNiveles]);
 
   const lideresEnlacesLista = useMemo(
     () =>
@@ -609,30 +815,22 @@ export default function ReporteLideresClasificacion({
   );
 
   const datosGrafico = useMemo(() => {
-    const claves: Array<{ key: string; label: string }> = [
-      { key: "alto", label: "Alto" },
-      { key: "medio", label: "Medio" },
-      { key: "bajo", label: "Bajo" },
-      { key: "otro", label: "Sin calificar" },
-    ];
-    const counts = new Map<string, number>(claves.map((c) => [c.label, 0]));
+    const counts = new Map<NivelTabla, number>(
+      NIVELES_TABLA.map((n) => [n, 0]),
+    );
     lideresEnVista.forEach((l) => {
-      const v = String(l.nivel_compromiso ?? "").toLowerCase();
-      if (v === "alto") counts.set("Alto", (counts.get("Alto") ?? 0) + 1);
-      else if (v === "medio")
-        counts.set("Medio", (counts.get("Medio") ?? 0) + 1);
-      else if (v === "bajo") counts.set("Bajo", (counts.get("Bajo") ?? 0) + 1);
-      else counts.set("Sin calificar", (counts.get("Sin calificar") ?? 0) + 1);
+      const v = l.nivelCalculado;
+      counts.set(v, (counts.get(v) ?? 0) + 1);
     });
-    return claves.map((c) => ({
-      nombre: c.label,
-      cantidad: counts.get(c.label) ?? 0,
-      fill: COLORS_BAR[c.label],
+    return NIVELES_TABLA.map((nombre) => ({
+      nombre,
+      cantidad: counts.get(nombre) ?? 0,
+      fill: COLORS_BAR[nombre],
     }));
   }, [lideresEnVista]);
 
   const pieData = useMemo(
-    () =>
+    (): DonaSlice[] =>
       datosGrafico
         .filter((d) => d.cantidad > 0)
         .map((d) => ({
@@ -785,6 +983,16 @@ export default function ReporteLideresClasificacion({
     [bloquesRegion],
   );
 
+  const regionPieDona = useMemo(
+    (): DonaSlice[] =>
+      regionPiePorSector.map((d) => ({
+        name: d.nombreCompleto,
+        value: d.value,
+        fill: d.fill,
+      })),
+    [regionPiePorSector],
+  );
+
   const regionBarrasPorSector = useMemo(
     () =>
       bloquesRegion
@@ -898,7 +1106,7 @@ export default function ReporteLideresClasificacion({
       ],
       ...ordenadosFiltrados.map((row, i) => {
         const nombre = `${row.nombres} ${row.apellidos}`.trim();
-        const label = ETIQUETA_NIVEL(row.nivel_compromiso);
+        const label = row.nivelCalculado;
         return [
           i + 1,
           nombre,
@@ -1033,29 +1241,29 @@ export default function ReporteLideresClasificacion({
             leaveFrom="opacity-100 translate-y-0"
             leaveTo="opacity-0 translate-y-2"
           >
-            <DialogPanel className="relative flex h-full w-full min-h-0 flex-col bg-slate-50">
-              <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 bg-white px-4 py-4 md:px-6 md:items-center">
+            <DialogPanel className="relative flex h-full w-full min-h-0 flex-col bg-slate-50 dark:bg-neutral-950">
+              <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-4 py-4 md:px-6 md:items-center">
                 <div className="flex min-w-0 flex-1 items-start gap-2 md:items-center">
                   <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-700 text-white md:mt-0">
                     <PieChartIcon className="h-5 w-5" />
                   </div>
                   <div className="min-w-0 pr-2">
-                    <h2 className="truncate text-lg font-black uppercase tracking-tight text-slate-900 md:text-xl">
+                    <h2 className="truncate text-lg font-black uppercase tracking-tight text-slate-900 dark:text-gray-100 md:text-xl">
                       {tituloCabeceraReporte}
                     </h2>
-                    <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500 md:text-xs">
+                    <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-gray-400 md:text-xs">
                       {subtituloCabeceraReporte}
                     </p>
                   </div>
                 </div>
                 <div className="flex shrink-0 flex-row items-center gap-2">
                   {mostrarOpcionSimular && (
-                    <label className="flex cursor-pointer select-none items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2">
+                    <label className="flex cursor-pointer select-none items-center gap-3 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2">
                       <Switch
                         checked={simularRegistros}
                         onCheckedChange={setSimularRegistros}
                       />
-                      <span className="whitespace-nowrap text-xs font-semibold leading-snug text-slate-800 sm:text-sm">
+                      <span className="whitespace-nowrap text-xs font-semibold leading-snug text-slate-800 dark:text-gray-200 sm:text-sm">
                         Simular
                       </span>
                     </label>
@@ -1064,7 +1272,7 @@ export default function ReporteLideresClasificacion({
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="h-10 w-10 shrink-0 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    className="h-10 w-10 shrink-0 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-slate-600 dark:text-gray-400 hover:bg-slate-50 dark:hover:bg-neutral-800"
                     onClick={onClose}
                     aria-label="Cerrar"
                   >
@@ -1074,14 +1282,14 @@ export default function ReporteLideresClasificacion({
               </div>
 
               <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-                <div className="flex shrink-0 flex-wrap gap-2 border-b border-slate-200 bg-white px-4 pt-2 pb-3 md:px-6">
+                <div className="flex shrink-0 flex-wrap gap-2 border-b border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-4 pt-2 pb-3 md:px-6">
                   <button
                     type="button"
                     onClick={() => setPestañaReporte("lideres")}
                     className={`flex items-center gap-2 rounded-t-lg border-2 border-b-0 px-4 py-2.5 text-xs font-black uppercase md:text-sm ${
                       pestañaReporte === "lideres"
-                        ? "border-amber-400 bg-amber-400 text-slate-900"
-                        : "border-transparent bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        ? "border-amber-400 bg-amber-400 text-slate-900 dark:text-gray-100"
+                        : "border-transparent bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-gray-400 hover:bg-slate-200 dark:hover:bg-neutral-700"
                     }`}
                   >
                     <Crown className="h-4 w-4 shrink-0" aria-hidden />
@@ -1093,7 +1301,7 @@ export default function ReporteLideresClasificacion({
                     className={`flex items-center gap-2 rounded-t-lg border-2 border-b-0 px-4 py-2.5 text-xs font-black uppercase md:text-sm ${
                       pestañaReporte === "enlaces"
                         ? "border-indigo-600 bg-indigo-600 text-white"
-                        : "border-transparent bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        : "border-transparent bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-gray-400 hover:bg-slate-200 dark:hover:bg-neutral-700"
                     }`}
                   >
                     <UsersRound className="h-4 w-4 shrink-0" aria-hidden />
@@ -1105,7 +1313,7 @@ export default function ReporteLideresClasificacion({
                     className={`flex items-center gap-2 rounded-t-lg border-2 border-b-0 px-4 py-2.5 text-xs font-black uppercase md:text-sm ${
                       pestañaReporte === "region"
                         ? "border-teal-700 bg-teal-700 text-white"
-                        : "border-transparent bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        : "border-transparent bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-gray-400 hover:bg-slate-200 dark:hover:bg-neutral-700"
                     }`}
                   >
                     <MapPin className="h-4 w-4 shrink-0" aria-hidden />
@@ -1116,8 +1324,8 @@ export default function ReporteLideresClasificacion({
                   <div className="mx-auto flex max-w-[1400px] flex-col gap-6 lg:gap-8">
                   {pestañaReporte === "lideres" && (
                     <>
-                      <div className="rounded-lg border border-amber-300 bg-amber-50/50 px-3 py-2 text-xs leading-snug text-slate-700">
-                        <span className="font-black uppercase text-amber-900">
+                      <div className="rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50/50 dark:bg-amber-950/30 px-3 py-2 text-xs leading-snug text-slate-700 dark:text-gray-300">
+                        <span className="font-black uppercase text-amber-900 dark:text-amber-300">
                           Líderes:
                         </span>{" "}
                         La vista resume la clasificación por nivel de compromiso de cada líder (
@@ -1127,8 +1335,8 @@ export default function ReporteLideresClasificacion({
                         ).
                       </div>
                       <div className="grid gap-5 lg:grid-cols-2 lg:gap-6">
-                        <div className="rounded-2xl border border-slate-200 bg-white p-4 md:p-5">
-                          <h3 className="mb-4 text-xs font-black uppercase tracking-wider text-slate-500">
+                        <div className="rounded-2xl border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-4 md:p-5">
+                          <h3 className="mb-4 text-xs font-black uppercase tracking-wider text-slate-500 dark:text-gray-400">
                             Distribución (barras)
                           </h3>
                           <div className="h-64 w-full md:h-72">
@@ -1145,35 +1353,33 @@ export default function ReporteLideresClasificacion({
                                 <CartesianGrid
                                   strokeDasharray="3 3"
                                   vertical={false}
-                                  stroke="#e2e8f0"
+                                  stroke={chartTheme.grid}
                                 />
                                 <XAxis
                                   dataKey="nombre"
                                   tick={{
                                     fontSize: 11,
-                                    fill: "#64748b",
+                                    fill: chartTheme.tick,
                                     fontWeight: 600,
                                   }}
-                                  axisLine={{ stroke: "#cbd5e1" }}
+                                  axisLine={{ stroke: chartTheme.grid }}
                                   tickLine={false}
                                 />
                                 <YAxis
                                   allowDecimals={false}
-                                  tick={{ fontSize: 11, fill: "#64748b" }}
+                                  tick={{ fontSize: 11, fill: chartTheme.tick }}
                                   axisLine={false}
                                   tickLine={false}
                                 />
                                 <Tooltip
-                                  cursor={{ fill: "rgba(241,245,249,0.9)" }}
-                                  contentStyle={{
-                                    borderRadius: 8,
-                                    border: "1px solid #e2e8f0",
-                                  }}
+                                  cursor={false}
+                                  content={<TooltipBarraSimple />}
                                 />
                                 <Bar
                                   dataKey="cantidad"
                                   radius={[10, 10, 0, 0]}
                                   name="Líderes"
+                                  activeBar={{ opacity: 0.82 }}
                                 >
                                   {datosGrafico.map((e) => (
                                     <Cell key={e.nombre} fill={e.fill} />
@@ -1183,71 +1389,21 @@ export default function ReporteLideresClasificacion({
                             </ResponsiveContainer>
                           </div>
                         </div>
-                        <div className="rounded-2xl border border-slate-200 bg-white p-4 md:p-5">
-                          <h3 className="mb-2 text-xs font-black uppercase tracking-wider text-slate-500">
+                        <div className="rounded-2xl border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-4 md:p-5">
+                          <h3 className="mb-2 text-xs font-black uppercase tracking-wider text-slate-500 dark:text-gray-400">
                             Distribución (dona)
                           </h3>
-                          <div className="flex h-64 w-full flex-col md:h-72">
-                            {pieData.length > 0 ? (
-                              <ResponsiveContainer width="100%" height="100%">
-                                <PieChart
-                                  margin={{
-                                    top: 8,
-                                    right: 8,
-                                    left: 8,
-                                    bottom: 8,
-                                  }}
-                                >
-                                  <Tooltip
-                                    contentStyle={{
-                                      borderRadius: 8,
-                                      border: "1px solid #e2e8f0",
-                                    }}
-                                  />
-                                  <Pie
-                                    data={pieData}
-                                    dataKey="value"
-                                    nameKey="name"
-                                    cx="50%"
-                                    cy="46%"
-                                    innerRadius="48%"
-                                    outerRadius="78%"
-                                    stroke="#fff"
-                                    strokeWidth={3}
-                                    paddingAngle={2}
-                                  >
-                                    {pieData.map((e) => (
-                                      <Cell key={e.name} fill={e.fill} />
-                                    ))}
-                                  </Pie>
-                                  <Legend
-                                    verticalAlign="bottom"
-                                    align="center"
-                                    layout="horizontal"
-                                    wrapperStyle={{
-                                      paddingTop: 16,
-                                      fontSize: 12,
-                                      fontWeight: 700,
-                                      color: "#475569",
-                                    }}
-                                    formatter={(value, entry) =>
-                                      `${value}: ${(entry.payload as { value?: number })?.value ?? ""}`
-                                    }
-                                  />
-                                </PieChart>
-                              </ResponsiveContainer>
-                            ) : (
-                              <p className="flex flex-1 items-center justify-center text-sm text-slate-500">
-                                No hay líderes para graficar.
-                              </p>
-                            )}
-                          </div>
+                          <DonaInteractiva
+                            data={pieData}
+                            stroke={chartTheme.stroke}
+                            vacio="No hay líderes para graficar."
+                          />
                         </div>
                       </div>
 
-                      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                        <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 md:px-5">
-                          <h3 className="shrink-0 text-xs font-black uppercase tracking-wider text-slate-600">
+                      <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900">
+                        <div className="flex flex-col gap-3 border-b border-slate-200 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-950 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 md:px-5">
+                          <h3 className="shrink-0 text-xs font-black uppercase tracking-wider text-slate-600 dark:text-gray-400">
                             Detalle · clasificación
                           </h3>
                           <div className="flex flex-wrap items-center gap-2">
@@ -1257,7 +1413,7 @@ export default function ReporteLideresClasificacion({
                               className={`rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase md:px-3 md:text-xs ${
                                 filtroDetalleNiveles === null
                                   ? "border-slate-800 bg-slate-800 text-white"
-                                  : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
+                                  : "border-slate-300 dark:border-neutral-600 bg-white dark:bg-neutral-900 text-slate-700 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-neutral-800"
                               }`}
                             >
                               Todos
@@ -1273,7 +1429,7 @@ export default function ReporteLideresClasificacion({
                                   className={`rounded-lg border-2 px-2.5 py-1 text-[10px] font-black uppercase md:px-3 md:text-xs ${
                                     coloreado
                                       ? "border-transparent text-white"
-                                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                                      : "border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-slate-600 dark:text-gray-400 hover:bg-slate-50 dark:hover:bg-neutral-800"
                                   }`}
                                   style={
                                     coloreado
@@ -1294,7 +1450,7 @@ export default function ReporteLideresClasificacion({
                               size="sm"
                               disabled={ordenadosFiltrados.length === 0}
                               onClick={descargarExcelDetalleClasificacion}
-                              className="h-9 gap-1.5 border-slate-300 text-[10px] font-black uppercase md:text-xs"
+                              className="h-9 gap-1.5 border-slate-300 dark:border-neutral-600 text-[10px] font-black uppercase md:text-xs"
                               aria-label="Descargar Excel detalle clasificación"
                             >
                               <FileSpreadsheet className="h-4 w-4 shrink-0" />
@@ -1305,7 +1461,7 @@ export default function ReporteLideresClasificacion({
                         <div className="overflow-x-auto">
                           <table className="w-full text-sm">
                             <thead>
-                              <tr className="border-b border-slate-100 bg-slate-50/90 text-left text-[10px] font-black uppercase tracking-wide text-slate-500 md:text-xs">
+                              <tr className="border-b border-slate-100 dark:border-neutral-800 bg-slate-50 dark:bg-neutral-950/90 text-left text-[10px] font-black uppercase tracking-wide text-slate-500 dark:text-gray-400 md:text-xs">
                                 <th className="px-3 py-3 md:px-4">#</th>
                                 <th className="px-3 py-3 md:px-4">Líder</th>
                                 <th className="px-3 py-3 md:px-4">
@@ -1325,24 +1481,20 @@ export default function ReporteLideresClasificacion({
                             </thead>
                             <tbody>
                               {filasPaginaDetalle.map((row, i) => {
-                                const label = ETIQUETA_NIVEL(
-                                  row.nivel_compromiso,
-                                );
-                                const color =
-                                  COLORS_BAR[label] ??
-                                  COLORS_BAR["Sin calificar"];
+                                const label = row.nivelCalculado;
+                                const color = COLORS_BAR[label];
                                 return (
                                   <tr
                                     key={row.id}
-                                    className="border-b border-slate-100/80 transition-colors hover:bg-slate-50"
+                                    className="border-b border-slate-100 dark:border-neutral-800/80 transition-colors hover:bg-slate-50 dark:hover:bg-neutral-800"
                                   >
-                                    <td className="px-3 py-3 font-mono text-xs text-slate-400 md:px-4">
+                                    <td className="px-3 py-3 font-mono text-xs text-slate-400 dark:text-gray-500 md:px-4">
                                       {indiceInicioDetalle + i + 1}
                                     </td>
-                                    <td className="px-3 py-3 font-semibold text-slate-900 md:px-4">
+                                    <td className="px-3 py-3 font-semibold text-slate-900 dark:text-gray-100 md:px-4">
                                       {row.nombres} {row.apellidos}
                                     </td>
-                                    <td className="px-3 py-3 text-xs italic text-slate-600 md:px-4">
+                                    <td className="px-3 py-3 text-xs italic text-slate-600 dark:text-gray-400 md:px-4">
                                       {row.email}
                                     </td>
                                     <td className="px-3 py-3 md:px-4">
@@ -1353,13 +1505,13 @@ export default function ReporteLideresClasificacion({
                                         {label}
                                       </span>
                                     </td>
-                                    <td className="px-3 py-3 text-right font-bold tabular-nums text-slate-900 md:px-4">
+                                    <td className="px-3 py-3 text-right font-bold tabular-nums text-slate-900 dark:text-gray-100 md:px-4">
                                       {row.conteoAfiliados ?? 0}
                                     </td>
-                                    <td className="px-3 py-3 text-right tabular-nums text-slate-800 md:px-4">
+                                    <td className="px-3 py-3 text-right tabular-nums text-slate-800 dark:text-gray-200 md:px-4">
                                       {row.conteoTitulares ?? 0}
                                     </td>
-                                    <td className="px-3 py-3 text-right tabular-nums text-slate-800 md:px-4">
+                                    <td className="px-3 py-3 text-right tabular-nums text-slate-800 dark:text-gray-200 md:px-4">
                                       {row.conteoFamiliares ?? 0}
                                     </td>
                                   </tr>
@@ -1369,8 +1521,8 @@ export default function ReporteLideresClasificacion({
                           </table>
                         </div>
                         {ordenadosFiltrados.length > 0 && (
-                          <div className="flex flex-col items-center justify-between gap-3 border-t border-slate-200 bg-slate-50/50 px-4 py-3 sm:flex-row md:px-5">
-                            <span className="text-xs font-semibold text-slate-600">
+                          <div className="flex flex-col items-center justify-between gap-3 border-t border-slate-200 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-950/50 px-4 py-3 sm:flex-row md:px-5">
+                            <span className="text-xs font-semibold text-slate-600 dark:text-gray-400">
                               {indiceInicioDetalle + 1}–
                               {Math.min(
                                 indiceInicioDetalle + PAGE_SIZE_DETALLE,
@@ -1383,7 +1535,7 @@ export default function ReporteLideresClasificacion({
                                 type="button"
                                 size="sm"
                                 variant="outline"
-                                className="h-9 w-9 rounded-lg border-slate-300 p-0 text-slate-700 hover:bg-slate-100"
+                                className="h-9 w-9 rounded-lg border-slate-300 dark:border-neutral-600 p-0 text-slate-700 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-neutral-800"
                                 disabled={paginaDetalleSegura <= 1}
                                 onClick={() =>
                                   setPaginaDetalle((p) => Math.max(1, p - 1))
@@ -1391,14 +1543,14 @@ export default function ReporteLideresClasificacion({
                               >
                                 <ChevronLeft className="h-5 w-5" />
                               </Button>
-                              <span className="min-w-[5rem] text-center text-xs font-black text-slate-900 tabular-nums">
+                              <span className="min-w-[5rem] text-center text-xs font-black text-slate-900 dark:text-gray-100 tabular-nums">
                                 {paginaDetalleSegura} / {totalPaginasDetalle}
                               </span>
                               <Button
                                 type="button"
                                 size="sm"
                                 variant="outline"
-                                className="h-9 w-9 rounded-lg border-slate-300 p-0 text-slate-700 hover:bg-slate-100"
+                                className="h-9 w-9 rounded-lg border-slate-300 dark:border-neutral-600 p-0 text-slate-700 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-neutral-800"
                                 disabled={
                                   paginaDetalleSegura >= totalPaginasDetalle
                                 }
@@ -1414,13 +1566,13 @@ export default function ReporteLideresClasificacion({
                           </div>
                         )}
                         {ordenados.length === 0 && (
-                          <p className="p-8 text-center text-sm text-slate-500">
+                          <p className="p-8 text-center text-sm text-slate-500 dark:text-gray-400">
                             No hay líderes en el sistema.
                           </p>
                         )}
                         {ordenados.length > 0 &&
                           ordenadosFiltrados.length === 0 && (
-                            <p className="p-8 text-center text-sm text-slate-500">
+                            <p className="p-8 text-center text-sm text-slate-500 dark:text-gray-400">
                               Ningún líder coincide con los niveles
                               seleccionados.
                             </p>
@@ -1430,8 +1582,8 @@ export default function ReporteLideresClasificacion({
                   )}
                   {pestañaReporte === "enlaces" && (
                     <>
-                      <div className="rounded-lg border border-indigo-200 bg-indigo-50/40 px-3 py-2 text-xs leading-snug text-slate-700">
-                        <span className="font-black uppercase text-indigo-900">
+                      <div className="rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50/40 dark:bg-indigo-950/30 px-3 py-2 text-xs leading-snug text-slate-700 dark:text-gray-300">
+                        <span className="font-black uppercase text-indigo-900 dark:text-indigo-300">
                           Enlaces:
                         </span>{" "}
                         La vista muestra titulares y familiares por líder y las gráficas
@@ -1442,142 +1594,42 @@ export default function ReporteLideresClasificacion({
                         ).
                       </div>
                       <div className="grid gap-5 lg:grid-cols-2 lg:gap-6">
-                        <div className="rounded-2xl border border-slate-200 bg-white p-4 md:p-5">
-                          <h3 className="mb-1 text-xs font-black uppercase tracking-wider text-slate-500">
+                        <div className="rounded-2xl border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-4 md:p-5">
+                          <h3 className="mb-1 text-xs font-black uppercase tracking-wider text-slate-500 dark:text-gray-400">
                             Miembros agregados
                           </h3>
-                          <p className="mb-3 text-[11px] text-slate-500">
+                          <p className="mb-3 text-[11px] text-slate-500 dark:text-gray-400">
                             Total titulares vs familiares en la vista actual.
                           </p>
-                          <div className="h-64 w-full md:h-72">
-                            {enlacesPieMiembros.length > 0 ? (
-                              <ResponsiveContainer width="100%" height="100%">
-                                <PieChart
-                                  margin={{
-                                    top: 8,
-                                    right: 8,
-                                    left: 8,
-                                    bottom: 8,
-                                  }}
-                                >
-                                  <Tooltip
-                                    contentStyle={{
-                                      borderRadius: 8,
-                                      border: "1px solid #e2e8f0",
-                                    }}
-                                  />
-                                  <Pie
-                                    data={enlacesPieMiembros}
-                                    dataKey="value"
-                                    nameKey="name"
-                                    cx="50%"
-                                    cy="46%"
-                                    innerRadius="48%"
-                                    outerRadius="78%"
-                                    stroke="#fff"
-                                    strokeWidth={3}
-                                    paddingAngle={2}
-                                  >
-                                    {enlacesPieMiembros.map((e) => (
-                                      <Cell key={e.name} fill={e.fill} />
-                                    ))}
-                                  </Pie>
-                                  <Legend
-                                    verticalAlign="bottom"
-                                    align="center"
-                                    layout="horizontal"
-                                    wrapperStyle={{
-                                      paddingTop: 16,
-                                      fontSize: 12,
-                                      fontWeight: 700,
-                                      color: "#475569",
-                                    }}
-                                    formatter={(value, entry) =>
-                                      `${value}: ${(entry.payload as { value?: number })?.value ?? ""}`
-                                    }
-                                  />
-                                </PieChart>
-                              </ResponsiveContainer>
-                            ) : (
-                              <p className="flex h-full items-center justify-center text-sm text-slate-500">
-                                Sin miembros en esta vista.
-                              </p>
-                            )}
-                          </div>
+                          <DonaInteractiva
+                            data={enlacesPieMiembros}
+                            stroke={chartTheme.stroke}
+                            vacio="Sin miembros en esta vista."
+                          />
                         </div>
-                        <div className="rounded-2xl border border-slate-200 bg-white p-4 md:p-5">
-                          <h3 className="mb-1 text-xs font-black uppercase tracking-wider text-slate-500">
+                        <div className="rounded-2xl border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-4 md:p-5">
+                          <h3 className="mb-1 text-xs font-black uppercase tracking-wider text-slate-500 dark:text-gray-400">
                             Líderes por tipo de vínculo
                           </h3>
-                          <p className="mb-3 text-[11px] text-slate-500">
+                          <p className="mb-3 text-[11px] text-slate-500 dark:text-gray-400">
                             Con familiares en célula, solo titulares o sin
                             miembros.
                           </p>
-                          <div className="h-64 w-full md:h-72">
-                            {enlacesPieLideresRed.length > 0 ? (
-                              <ResponsiveContainer width="100%" height="100%">
-                                <PieChart
-                                  margin={{
-                                    top: 8,
-                                    right: 8,
-                                    left: 8,
-                                    bottom: 8,
-                                  }}
-                                >
-                                  <Tooltip
-                                    contentStyle={{
-                                      borderRadius: 8,
-                                      border: "1px solid #e2e8f0",
-                                    }}
-                                  />
-                                  <Pie
-                                    data={enlacesPieLideresRed}
-                                    dataKey="value"
-                                    nameKey="name"
-                                    cx="50%"
-                                    cy="46%"
-                                    innerRadius="48%"
-                                    outerRadius="78%"
-                                    stroke="#fff"
-                                    strokeWidth={3}
-                                    paddingAngle={2}
-                                  >
-                                    {enlacesPieLideresRed.map((e) => (
-                                      <Cell key={e.name} fill={e.fill} />
-                                    ))}
-                                  </Pie>
-                                  <Legend
-                                    verticalAlign="bottom"
-                                    align="center"
-                                    layout="horizontal"
-                                    wrapperStyle={{
-                                      paddingTop: 16,
-                                      fontSize: 12,
-                                      fontWeight: 700,
-                                      color: "#475569",
-                                    }}
-                                    formatter={(value, entry) =>
-                                      `${value}: ${(entry.payload as { value?: number })?.value ?? ""}`
-                                    }
-                                  />
-                                </PieChart>
-                              </ResponsiveContainer>
-                            ) : (
-                              <p className="flex h-full items-center justify-center text-sm text-slate-500">
-                                Sin líderes en esta vista.
-                              </p>
-                            )}
-                          </div>
+                          <DonaInteractiva
+                            data={enlacesPieLideresRed}
+                            stroke={chartTheme.stroke}
+                            vacio="Sin líderes en esta vista."
+                          />
                         </div>
                       </div>
 
-                      <div className="rounded-2xl border border-slate-200 bg-white">
-                        <div className="flex flex-col gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 md:px-5">
+                      <div className="rounded-2xl border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900">
+                        <div className="flex flex-col gap-2 border-b border-slate-200 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-950 px-4 py-3 md:px-5">
                           <div>
-                            <h3 className="text-xs font-black uppercase tracking-wider text-slate-600">
+                            <h3 className="text-xs font-black uppercase tracking-wider text-slate-600 dark:text-gray-400">
                               Barras apiladas por líder
                             </h3>
-                            <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                            <p className="mt-1 text-[11px] font-semibold text-slate-500 dark:text-gray-400">
                               {PAGE_SIZE_DETALLE} por página · misma página que
                               la tabla (paginador central)
                             </p>
@@ -1603,12 +1655,15 @@ export default function ReporteLideresClasificacion({
                                   <CartesianGrid
                                     strokeDasharray="3 3"
                                     horizontal={false}
-                                    stroke="#e2e8f0"
+                                    stroke={chartTheme.grid}
                                   />
                                   <XAxis
                                     type="number"
                                     allowDecimals={false}
-                                    tick={{ fontSize: 11 }}
+                                    tick={{
+                                      fontSize: 11,
+                                      fill: chartTheme.tick,
+                                    }}
                                   />
                                   <YAxis
                                     type="category"
@@ -1617,19 +1672,18 @@ export default function ReporteLideresClasificacion({
                                     tickMargin={vistaBarrasMovil ? 2 : 8}
                                     tick={{
                                       fontSize: vistaBarrasMovil ? 9 : 10,
-                                      fill: "#64748b",
+                                      fill: chartTheme.tick,
                                     }}
                                   />
                                   <Tooltip
-                                    contentStyle={{
-                                      borderRadius: 8,
-                                      border: "1px solid #e2e8f0",
-                                    }}
+                                    cursor={false}
+                                    content={<TooltipBarraReporte />}
                                   />
                                   <Legend
                                     wrapperStyle={{
                                       fontSize: 11,
                                       fontWeight: 700,
+                                      color: chartTheme.tick,
                                     }}
                                   />
                                   <Bar
@@ -1637,18 +1691,20 @@ export default function ReporteLideresClasificacion({
                                     stackId="m"
                                     fill={COLOR_TITULAR}
                                     name="Titulares"
+                                    activeBar={{ opacity: 0.82 }}
                                   />
                                   <Bar
                                     dataKey="familiares"
                                     stackId="m"
                                     fill={COLOR_FAMILIAR}
                                     name="Familiares"
+                                    activeBar={{ opacity: 0.82 }}
                                   />
                                 </BarChart>
                               </ResponsiveContainer>
                             </div>
                           ) : (
-                            <p className="py-12 text-center text-sm text-slate-500">
+                            <p className="py-12 text-center text-sm text-slate-500 dark:text-gray-400">
                               Sin líderes en esta vista.
                             </p>
                           )}
@@ -1656,8 +1712,8 @@ export default function ReporteLideresClasificacion({
                       </div>
 
                       {lideresEnlacesLista.length > 0 && (
-                        <div className="mx-auto flex w-full max-w-md flex-col items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm sm:flex-row sm:justify-between md:max-w-xl md:px-5">
-                          <span className="text-center text-xs font-semibold text-slate-600 sm:text-left">
+                        <div className="mx-auto flex w-full max-w-md flex-col items-center justify-center gap-3 rounded-xl border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-4 py-3 shadow-sm sm:flex-row sm:justify-between md:max-w-xl md:px-5">
+                          <span className="text-center text-xs font-semibold text-slate-600 dark:text-gray-400 sm:text-left">
                             {indiceInicioEnlaces + 1}–
                             {Math.min(
                               indiceInicioEnlaces + PAGE_SIZE_DETALLE,
@@ -1670,7 +1726,7 @@ export default function ReporteLideresClasificacion({
                               type="button"
                               size="sm"
                               variant="outline"
-                              className="h-9 w-9 rounded-lg border-slate-300 p-0 text-slate-700 hover:bg-slate-100"
+                              className="h-9 w-9 rounded-lg border-slate-300 dark:border-neutral-600 p-0 text-slate-700 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-neutral-800"
                               disabled={paginaEnlacesSegura <= 1}
                               onClick={() =>
                                 setPaginaEnlaces((p) => Math.max(1, p - 1))
@@ -1678,14 +1734,14 @@ export default function ReporteLideresClasificacion({
                             >
                               <ChevronLeft className="h-5 w-5" />
                             </Button>
-                            <span className="min-w-[5rem] text-center text-xs font-black text-slate-900 tabular-nums">
+                            <span className="min-w-[5rem] text-center text-xs font-black text-slate-900 dark:text-gray-100 tabular-nums">
                               {paginaEnlacesSegura} / {totalPaginasEnlaces}
                             </span>
                             <Button
                               type="button"
                               size="sm"
                               variant="outline"
-                              className="h-9 w-9 rounded-lg border-slate-300 p-0 text-slate-700 hover:bg-slate-100"
+                              className="h-9 w-9 rounded-lg border-slate-300 dark:border-neutral-600 p-0 text-slate-700 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-neutral-800"
                               disabled={
                                 paginaEnlacesSegura >= totalPaginasEnlaces
                               }
@@ -1701,9 +1757,9 @@ export default function ReporteLideresClasificacion({
                         </div>
                       )}
 
-                      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                        <div className="flex flex-col gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between md:px-5">
-                          <h3 className="text-xs font-black uppercase tracking-wider text-slate-600">
+                      <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900">
+                        <div className="flex flex-col gap-2 border-b border-slate-200 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-950 px-4 py-3 sm:flex-row sm:items-center sm:justify-between md:px-5">
+                          <h3 className="text-xs font-black uppercase tracking-wider text-slate-600 dark:text-gray-400">
                             Tabla · titulares y familiares
                           </h3>
                           <Button
@@ -1712,7 +1768,7 @@ export default function ReporteLideresClasificacion({
                             size="sm"
                             disabled={lideresEnlacesLista.length === 0}
                             onClick={descargarExcelEnlacesTitularesFamiliares}
-                            className="h-9 w-full gap-1.5 border-slate-300 text-[10px] font-black uppercase sm:w-auto md:text-xs"
+                            className="h-9 w-full gap-1.5 border-slate-300 dark:border-neutral-600 text-[10px] font-black uppercase sm:w-auto md:text-xs"
                             aria-label="Descargar Excel enlaces titulares y familiares"
                           >
                             <FileSpreadsheet className="h-4 w-4 shrink-0" />
@@ -1722,7 +1778,7 @@ export default function ReporteLideresClasificacion({
                         <div className="overflow-x-auto">
                           <table className="w-full text-sm">
                             <thead>
-                              <tr className="border-b border-slate-100 bg-slate-50/90 text-left text-[10px] font-black uppercase tracking-wide text-slate-500 md:text-xs">
+                              <tr className="border-b border-slate-100 dark:border-neutral-800 bg-slate-50 dark:bg-neutral-950/90 text-left text-[10px] font-black uppercase tracking-wide text-slate-500 dark:text-gray-400 md:text-xs">
                                 <th className="px-3 py-3 md:px-4">#</th>
                                 <th className="px-3 py-3 md:px-4">Líder</th>
                                 <th className="px-3 py-3 text-right md:px-4">
@@ -1748,24 +1804,24 @@ export default function ReporteLideresClasificacion({
                                 return (
                                   <tr
                                     key={row.id}
-                                    className="border-b border-slate-100/80 transition-colors hover:bg-slate-50"
+                                    className="border-b border-slate-100 dark:border-neutral-800/80 transition-colors hover:bg-slate-50 dark:hover:bg-neutral-800"
                                   >
-                                    <td className="px-3 py-3 font-mono text-xs text-slate-400 md:px-4">
+                                    <td className="px-3 py-3 font-mono text-xs text-slate-400 dark:text-gray-500 md:px-4">
                                       {indiceInicioEnlaces + i + 1}
                                     </td>
-                                    <td className="px-3 py-3 font-semibold text-slate-900 md:px-4">
+                                    <td className="px-3 py-3 font-semibold text-slate-900 dark:text-gray-100 md:px-4">
                                       {row.nombres} {row.apellidos}
                                     </td>
-                                    <td className="px-3 py-3 text-right tabular-nums text-slate-800 md:px-4">
+                                    <td className="px-3 py-3 text-right tabular-nums text-slate-800 dark:text-gray-200 md:px-4">
                                       {row.conteoTitulares ?? 0}
                                     </td>
-                                    <td className="px-3 py-3 text-right tabular-nums text-slate-800 md:px-4">
+                                    <td className="px-3 py-3 text-right tabular-nums text-slate-800 dark:text-gray-200 md:px-4">
                                       {row.conteoFamiliares ?? 0}
                                     </td>
-                                    <td className="px-3 py-3 text-right font-bold tabular-nums text-slate-900 md:px-4">
+                                    <td className="px-3 py-3 text-right font-bold tabular-nums text-slate-900 dark:text-gray-100 md:px-4">
                                       {t}
                                     </td>
-                                    <td className="px-3 py-3 text-right tabular-nums text-slate-600 md:px-4">
+                                    <td className="px-3 py-3 text-right tabular-nums text-slate-600 dark:text-gray-400 md:px-4">
                                       {pct}%
                                     </td>
                                   </tr>
@@ -1775,13 +1831,13 @@ export default function ReporteLideresClasificacion({
                           </table>
                         </div>
                         {datosEfectivos.length === 0 && (
-                          <p className="p-8 text-center text-sm text-slate-500">
+                          <p className="p-8 text-center text-sm text-slate-500 dark:text-gray-400">
                             No hay líderes en el sistema.
                           </p>
                         )}
                         {datosEfectivos.length > 0 &&
                           lideresEnlacesLista.length === 0 && (
-                            <p className="p-8 text-center text-sm text-slate-500">
+                            <p className="p-8 text-center text-sm text-slate-500 dark:text-gray-400">
                               Ningún líder en la selección actual.
                             </p>
                           )}
@@ -1790,7 +1846,7 @@ export default function ReporteLideresClasificacion({
                   )}
                   {pestañaReporte === "region" && (
                     <>
-                      <div className="rounded-lg border border-teal-200 bg-teal-50/40 px-3 py-2 text-xs leading-snug text-slate-700">
+                      <div className="rounded-lg border border-teal-200 dark:border-teal-800 bg-teal-50/40 dark:bg-teal-950/30 px-3 py-2 text-xs leading-snug text-slate-700 dark:text-gray-300">
                         <span className="font-black uppercase text-teal-900">
                           Territorio:
                         </span>{" "}
@@ -1798,12 +1854,12 @@ export default function ReporteLideresClasificacion({
                         {!simulacionDatosActivada ? "lugares cargados desde el sistema" : "datos ilustrativos"}).
                       </div>
                       {afiliadosPorRegionFuente.length === 0 ? (
-                        <p className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm font-semibold text-slate-500">
+                        <p className="rounded-2xl border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-10 text-center text-sm font-semibold text-slate-500 dark:text-gray-400">
                           No hay afiliados para mostrar por territorio.
                         </p>
                       ) : bloquesRegion.length === 0 ||
                         bloquesRegion.every((b) => b.total === 0) ? (
-                        <p className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm font-semibold text-slate-500">
+                        <p className="rounded-2xl border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-10 text-center text-sm font-semibold text-slate-500 dark:text-gray-400">
                           Ningún afiliado coincide con datos de sector o lugar reconocibles.
                         </p>
                       ) : (
@@ -1835,7 +1891,7 @@ export default function ReporteLideresClasificacion({
                                 className={`rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase md:px-3 md:text-xs ${
                                   modoTerritorio === opt.id
                                     ? "border-teal-800 bg-teal-800 text-white"
-                                    : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
+                                    : "border-slate-300 dark:border-neutral-600 bg-white dark:bg-neutral-900 text-slate-700 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-neutral-800"
                                 }`}
                               >
                                 {opt.label}
@@ -1850,84 +1906,19 @@ export default function ReporteLideresClasificacion({
                             }
                           >
                             {!muestraChartsDistritoTerritorio && (
-                              <div className="rounded-2xl border border-slate-200 bg-white p-4 md:p-5">
-                                <h3 className="mb-2 text-xs font-black uppercase tracking-wider text-slate-500">
+                              <div className="rounded-2xl border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-4 md:p-5">
+                                <h3 className="mb-2 text-xs font-black uppercase tracking-wider text-slate-500 dark:text-gray-400">
                                   Distribución por sector (dona)
                                 </h3>
-                                <div className="h-64 w-full md:h-72">
-                                  {regionPiePorSector.length > 0 ? (
-                                    <ResponsiveContainer
-                                      width="100%"
-                                      height="100%"
-                                    >
-                                      <PieChart
-                                        margin={{
-                                          top: 8,
-                                          right: 8,
-                                          left: 8,
-                                          bottom: 8,
-                                        }}
-                                      >
-                                        <Tooltip
-                                          formatter={(value, name, item) =>
-                                            `${
-                                              (
-                                                item?.payload as {
-                                                  nombreCompleto?: string;
-                                                }
-                                              )?.nombreCompleto ?? String(name ?? "")
-                                            }: ${String(value ?? "")}`
-                                          }
-                                          contentStyle={{
-                                            borderRadius: 8,
-                                            border: "1px solid #e2e8f0",
-                                          }}
-                                        />
-                                        <Pie
-                                          data={regionPiePorSector}
-                                          dataKey="value"
-                                          nameKey="name"
-                                          cx="50%"
-                                          cy="46%"
-                                          innerRadius="46%"
-                                          outerRadius="74%"
-                                          stroke="#fff"
-                                          strokeWidth={3}
-                                          paddingAngle={2}
-                                        >
-                                          {regionPiePorSector.map((e, idx) => (
-                                            <Cell
-                                              key={`${idx}-${e.nombreCompleto}`}
-                                              fill={e.fill}
-                                            />
-                                          ))}
-                                        </Pie>
-                                        <Legend
-                                          verticalAlign="bottom"
-                                          align="center"
-                                          layout="horizontal"
-                                          wrapperStyle={{
-                                            paddingTop: 14,
-                                            fontSize: 11,
-                                            fontWeight: 700,
-                                            color: "#475569",
-                                          }}
-                                          formatter={(value, entry) =>
-                                            `${String(value ?? "")}: ${(entry.payload as { value?: number })?.value ?? ""}`
-                                          }
-                                        />
-                                      </PieChart>
-                                    </ResponsiveContainer>
-                                  ) : (
-                                    <p className="flex h-full items-center justify-center text-sm text-slate-500">
-                                      Sin segmentos suficientes.
-                                    </p>
-                                  )}
-                                </div>
+                                <DonaInteractiva
+                                  data={regionPieDona}
+                                  stroke={chartTheme.stroke}
+                                  vacio="Sin segmentos suficientes."
+                                />
                               </div>
                             )}
-                              <div className="rounded-2xl border border-slate-200 bg-white px-2 py-4 sm:p-4 md:p-5">
-                                <h3 className="mb-2 text-xs font-black uppercase tracking-wider text-slate-500">
+                              <div className="rounded-2xl border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-4 sm:p-4 md:p-5">
+                                <h3 className="mb-2 text-xs font-black uppercase tracking-wider text-slate-500 dark:text-gray-400">
                                   {territorioTituloBarras}
                                 </h3>
                                 <div
@@ -1953,12 +1944,15 @@ export default function ReporteLideresClasificacion({
                                       <CartesianGrid
                                         strokeDasharray="3 3"
                                         horizontal={false}
-                                        stroke="#e2e8f0"
+                                        stroke={chartTheme.grid}
                                       />
                                       <XAxis
                                         type="number"
                                         allowDecimals={false}
-                                        tick={{ fontSize: 11 }}
+                                        tick={{
+                                          fontSize: 11,
+                                          fill: chartTheme.tick,
+                                        }}
                                       />
                                       <YAxis
                                         type="category"
@@ -1975,10 +1969,11 @@ export default function ReporteLideresClasificacion({
                                         tickMargin={vistaBarrasMovil ? 2 : 8}
                                         tick={{
                                           fontSize: vistaBarrasMovil ? 9 : 10,
-                                          fill: "#64748b",
+                                          fill: chartTheme.tick,
                                         }}
                                       />
                                       <Tooltip
+                                        cursor={false}
                                         labelFormatter={(label, payloadArr) => {
                                           if (
                                             !muestraChartsDistritoTerritorio
@@ -1994,15 +1989,13 @@ export default function ReporteLideresClasificacion({
                                             String(label ?? "")
                                           );
                                         }}
-                                        contentStyle={{
-                                          borderRadius: 8,
-                                          border: "1px solid #e2e8f0",
-                                        }}
+                                        content={<TooltipBarraReporte />}
                                       />
                                       <Legend
                                         wrapperStyle={{
                                           fontSize: 11,
                                           fontWeight: 700,
+                                          color: chartTheme.tick,
                                         }}
                                       />
                                       <Bar
@@ -2010,12 +2003,14 @@ export default function ReporteLideresClasificacion({
                                         stackId="sf"
                                         fill={COLOR_TITULAR}
                                         name="Titulares"
+                                        activeBar={{ opacity: 0.82 }}
                                       />
                                       <Bar
                                         dataKey="familiares"
                                         stackId="sf"
                                         fill={COLOR_FAMILIAR}
                                         name="Familiares"
+                                        activeBar={{ opacity: 0.82 }}
                                       />
                                     </BarChart>
                                   </ResponsiveContainer>
@@ -2030,11 +2025,11 @@ export default function ReporteLideresClasificacion({
                                   <details
                                     key={`${bloque.sectorOrdenId}-${bloque.sectorNombre}`}
                                     open
-                                    className="group/details overflow-hidden rounded-2xl border border-slate-200 bg-white transition-shadow duration-300 ease-out open:shadow-md"
+                                    className="group/details overflow-hidden rounded-2xl border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 transition-shadow duration-300 ease-out open:shadow-md"
                                   >
-                                    <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/90 px-4 py-3 transition-colors duration-200 hover:bg-slate-100/90 md:px-5 [&::-webkit-details-marker]:hidden">
+                                    <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 border-b border-slate-100 dark:border-neutral-800 bg-slate-50 dark:bg-neutral-950/90 px-4 py-3 transition-colors duration-200 hover:bg-slate-100 dark:hover:bg-neutral-800/90 md:px-5 [&::-webkit-details-marker]:hidden">
                                       <div className="min-w-0">
-                                        <h3 className="text-xs font-black uppercase tracking-wider text-slate-700">
+                                        <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-gray-300">
                                           {bloque.sectorNombre}
                                         </h3>
                                         <p className="mt-0.5 text-[11px] font-semibold uppercase text-teal-800">
@@ -2055,7 +2050,7 @@ export default function ReporteLideresClasificacion({
                                               bloque,
                                             );
                                           }}
-                                          className="h-9 gap-1.5 border-slate-300 text-[10px] font-black uppercase md:text-xs"
+                                          className="h-9 gap-1.5 border-slate-300 dark:border-neutral-600 text-[10px] font-black uppercase md:text-xs"
                                           aria-label={`Descargar Excel territorio ${bloque.sectorNombre}`}
                                         >
                                           <FileSpreadsheet className="h-4 w-4 shrink-0" />
@@ -2075,7 +2070,7 @@ export default function ReporteLideresClasificacion({
                                         <div className="overflow-x-auto">
                                       <table className="w-full text-sm">
                                         <thead>
-                                          <tr className="border-b border-slate-100 bg-white text-left text-[10px] font-black uppercase tracking-wide text-slate-500 md:text-xs">
+                                          <tr className="border-b border-slate-100 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-left text-[10px] font-black uppercase tracking-wide text-slate-500 dark:text-gray-400 md:text-xs">
                                             <th className="px-3 py-3 md:px-5">
                                               Lugar
                                             </th>
@@ -2106,21 +2101,21 @@ export default function ReporteLideresClasificacion({
                                             return (
                                               <tr
                                                 key={lugar.nombre}
-                                                className="border-b border-slate-50 transition-colors hover:bg-slate-50/80"
+                                                className="border-b border-slate-50 dark:border-neutral-800 transition-colors hover:bg-slate-50 dark:hover:bg-neutral-800/80"
                                               >
-                                                <td className="px-3 py-3 font-semibold uppercase text-slate-900 md:px-5">
+                                                <td className="px-3 py-3 font-semibold uppercase text-slate-900 dark:text-gray-100 md:px-5">
                                                   {lugar.nombre}
                                                 </td>
-                                                <td className="px-3 py-3 text-right tabular-nums text-slate-800 md:px-5">
+                                                <td className="px-3 py-3 text-right tabular-nums text-slate-800 dark:text-gray-200 md:px-5">
                                                   {lugar.titulares}
                                                 </td>
-                                                <td className="px-3 py-3 text-right tabular-nums text-slate-800 md:px-5">
+                                                <td className="px-3 py-3 text-right tabular-nums text-slate-800 dark:text-gray-200 md:px-5">
                                                   {lugar.familiares}
                                                 </td>
-                                                <td className="px-3 py-3 text-right font-bold tabular-nums text-slate-950 md:px-5">
+                                                <td className="px-3 py-3 text-right font-bold tabular-nums text-slate-950 dark:text-gray-50 md:px-5">
                                                   {lugar.total}
                                                 </td>
-                                                <td className="px-3 py-3 text-right tabular-nums text-slate-500 md:px-5">
+                                                <td className="px-3 py-3 text-right tabular-nums text-slate-500 dark:text-gray-400 md:px-5">
                                                   {pct}%
                                                 </td>
                                               </tr>
@@ -2136,9 +2131,9 @@ export default function ReporteLideresClasificacion({
                             </div>
                           )}
                           {modoTerritorio === "solo_region" && (
-                            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                              <div className="flex flex-col gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between md:px-5">
-                                <h3 className="text-xs font-black uppercase tracking-wider text-slate-600">
+                            <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900">
+                              <div className="flex flex-col gap-2 border-b border-slate-200 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-950 px-4 py-3 sm:flex-row sm:items-center sm:justify-between md:px-5">
+                                <h3 className="text-xs font-black uppercase tracking-wider text-slate-600 dark:text-gray-400">
                                   Tabla · solo región
                                 </h3>
                                 <Button
@@ -2149,7 +2144,7 @@ export default function ReporteLideresClasificacion({
                                     !bloquesRegion.some((b) => b.total > 0)
                                   }
                                   onClick={descargarExcelTerritorioSoloRegion}
-                                  className="h-9 w-full gap-1.5 border-slate-300 text-[10px] font-black uppercase sm:w-auto md:text-xs"
+                                  className="h-9 w-full gap-1.5 border-slate-300 dark:border-neutral-600 text-[10px] font-black uppercase sm:w-auto md:text-xs"
                                   aria-label="Descargar Excel territorio solo región"
                                 >
                                   <FileSpreadsheet className="h-4 w-4 shrink-0" />
@@ -2159,7 +2154,7 @@ export default function ReporteLideresClasificacion({
                               <div className="overflow-x-auto">
                                 <table className="w-full text-sm">
                                   <thead>
-                                    <tr className="border-b border-slate-100 bg-slate-50/90 text-left text-[10px] font-black uppercase tracking-wide text-slate-500 md:text-xs">
+                                    <tr className="border-b border-slate-100 dark:border-neutral-800 bg-slate-50 dark:bg-neutral-950/90 text-left text-[10px] font-black uppercase tracking-wide text-slate-500 dark:text-gray-400 md:text-xs">
                                       <th className="px-3 py-3 md:px-4">
                                         Región
                                       </th>
@@ -2192,21 +2187,21 @@ export default function ReporteLideresClasificacion({
                                         return (
                                           <tr
                                             key={`${bloque.sectorOrdenId}-${bloque.sectorNombre}`}
-                                            className="border-b border-slate-100/80 transition-colors hover:bg-slate-50"
+                                            className="border-b border-slate-100 dark:border-neutral-800/80 transition-colors hover:bg-slate-50 dark:hover:bg-neutral-800"
                                           >
-                                            <td className="px-3 py-3 font-semibold text-slate-900 md:px-4">
+                                            <td className="px-3 py-3 font-semibold text-slate-900 dark:text-gray-100 md:px-4">
                                               {bloque.sectorNombre}
                                             </td>
-                                            <td className="px-3 py-3 text-right tabular-nums text-slate-800 md:px-4">
+                                            <td className="px-3 py-3 text-right tabular-nums text-slate-800 dark:text-gray-200 md:px-4">
                                               {bloque.titulares}
                                             </td>
-                                            <td className="px-3 py-3 text-right tabular-nums text-slate-800 md:px-4">
+                                            <td className="px-3 py-3 text-right tabular-nums text-slate-800 dark:text-gray-200 md:px-4">
                                               {bloque.familiares}
                                             </td>
-                                            <td className="px-3 py-3 text-right font-bold tabular-nums text-slate-950 md:px-4">
+                                            <td className="px-3 py-3 text-right font-bold tabular-nums text-slate-950 dark:text-gray-50 md:px-4">
                                               {bloque.total}
                                             </td>
-                                            <td className="px-3 py-3 text-right tabular-nums text-slate-600 md:px-4">
+                                            <td className="px-3 py-3 text-right tabular-nums text-slate-600 dark:text-gray-400 md:px-4">
                                               {pct}%
                                             </td>
                                           </tr>
@@ -2218,9 +2213,9 @@ export default function ReporteLideresClasificacion({
                             </div>
                           )}
                           {modoTerritorio === "solo_distrito" && (
-                            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                              <div className="flex flex-col gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between md:px-5">
-                                <h3 className="text-xs font-black uppercase tracking-wider text-slate-600">
+                            <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900">
+                              <div className="flex flex-col gap-2 border-b border-slate-200 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-950 px-4 py-3 sm:flex-row sm:items-center sm:justify-between md:px-5">
+                                <h3 className="text-xs font-black uppercase tracking-wider text-slate-600 dark:text-gray-400">
                                   Tabla · solo distrito
                                 </h3>
                                 <Button
@@ -2229,7 +2224,7 @@ export default function ReporteLideresClasificacion({
                                   size="sm"
                                   disabled={filasDistritoTerritorio.length === 0}
                                   onClick={descargarExcelTerritorioSoloDistrito}
-                                  className="h-9 w-full gap-1.5 border-slate-300 text-[10px] font-black uppercase sm:w-auto md:text-xs"
+                                  className="h-9 w-full gap-1.5 border-slate-300 dark:border-neutral-600 text-[10px] font-black uppercase sm:w-auto md:text-xs"
                                   aria-label="Descargar Excel territorio solo distrito"
                                 >
                                   <FileSpreadsheet className="h-4 w-4 shrink-0" />
@@ -2239,7 +2234,7 @@ export default function ReporteLideresClasificacion({
                               <div className="overflow-x-auto">
                                 <table className="w-full text-sm">
                                   <thead>
-                                    <tr className="border-b border-slate-100 bg-slate-50/90 text-left text-[10px] font-black uppercase tracking-wide text-slate-500 md:text-xs">
+                                    <tr className="border-b border-slate-100 dark:border-neutral-800 bg-slate-50 dark:bg-neutral-950/90 text-left text-[10px] font-black uppercase tracking-wide text-slate-500 dark:text-gray-400 md:text-xs">
                                       <th className="px-3 py-3 md:px-4">
                                         Distrito
                                       </th>
@@ -2269,21 +2264,21 @@ export default function ReporteLideresClasificacion({
                                       return (
                                         <tr
                                           key={row.key}
-                                          className="border-b border-slate-100/80 transition-colors hover:bg-slate-50"
+                                          className="border-b border-slate-100 dark:border-neutral-800/80 transition-colors hover:bg-slate-50 dark:hover:bg-neutral-800"
                                         >
-                                          <td className="px-3 py-3 font-semibold uppercase text-slate-900 md:px-4">
+                                          <td className="px-3 py-3 font-semibold uppercase text-slate-900 dark:text-gray-100 md:px-4">
                                             {row.lugarNombre}
                                           </td>
-                                          <td className="px-3 py-3 text-right tabular-nums text-slate-800 md:px-4">
+                                          <td className="px-3 py-3 text-right tabular-nums text-slate-800 dark:text-gray-200 md:px-4">
                                             {row.titulares}
                                           </td>
-                                          <td className="px-3 py-3 text-right tabular-nums text-slate-800 md:px-4">
+                                          <td className="px-3 py-3 text-right tabular-nums text-slate-800 dark:text-gray-200 md:px-4">
                                             {row.familiares}
                                           </td>
-                                          <td className="px-3 py-3 text-right font-bold tabular-nums text-slate-950 md:px-4">
+                                          <td className="px-3 py-3 text-right font-bold tabular-nums text-slate-950 dark:text-gray-50 md:px-4">
                                             {row.total}
                                           </td>
-                                          <td className="px-3 py-3 text-right tabular-nums text-slate-600 md:px-4">
+                                          <td className="px-3 py-3 text-right tabular-nums text-slate-600 dark:text-gray-400 md:px-4">
                                             {pct}%
                                           </td>
                                         </tr>
