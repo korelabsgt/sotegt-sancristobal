@@ -1,23 +1,30 @@
 "use client";
 
-import { Building2 } from "lucide-react";
+import { Briefcase, Building2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { PiMedalDuotone } from "react-icons/pi";
 
 interface Props {
   totalSede: number;
   totalLideres: number;
+  totalEmpleados?: number;
   objetivoTotal?: number;
   mostrarSede?: boolean;
+  mostrarEmpleados?: boolean;
 }
 
 export default function MetaGeneral({
   totalSede,
   totalLideres,
+  totalEmpleados = 0,
   objetivoTotal = 0,
   mostrarSede = true,
+  mostrarEmpleados = false,
 }: Props) {
-  const total = mostrarSede ? totalSede + totalLideres : totalLideres;
+  const total =
+    (mostrarSede ? totalSede : 0) +
+    totalLideres +
+    (mostrarEmpleados ? totalEmpleados : 0);
   const objetivo = objetivoTotal > 0 ? objetivoTotal : 0;
   const pct = (n: number) =>
     objetivo > 0 ? Math.min((n / objetivo) * 100, 100) : 0;
@@ -52,6 +59,18 @@ export default function MetaGeneral({
           transition={{ duration: 1, ease: "easeOut", delay: mostrarSede ? 0.1 : 0 }}
           className="bg-orange-500 h-full shrink-0"
         />
+        {mostrarEmpleados && (
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${pct(totalEmpleados)}%` }}
+            transition={{
+              duration: 1,
+              ease: "easeOut",
+              delay: mostrarSede ? 0.2 : 0.1,
+            }}
+            className="bg-violet-500 h-full shrink-0"
+          />
+        )}
       </div>
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs md:text-sm font-bold uppercase">
         {mostrarSede && (
@@ -64,6 +83,12 @@ export default function MetaGeneral({
           <PiMedalDuotone className="h-4 w-4 shrink-0" />
           Enlaces: {totalLideres.toLocaleString()}
         </span>
+        {mostrarEmpleados && (
+          <span className="flex items-center gap-1.5 text-violet-600 dark:text-violet-400">
+            <Briefcase className="h-4 w-4 shrink-0" />
+            Empleados: {totalEmpleados.toLocaleString()}
+          </span>
+        )}
         <span className="font-black text-gray-900 dark:text-gray-100 normal-case md:ml-auto">
           Total: {total.toLocaleString()}
         </span>

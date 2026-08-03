@@ -22,6 +22,7 @@ import {
 } from "react";
 import {
   PiBuildingsDuotone,
+  PiBriefcaseDuotone,
   PiChatCircleDotsDuotone,
   PiClipboardTextDuotone,
   PiCodeDuotone,
@@ -48,7 +49,7 @@ import MetaGeneral from "./MetaGeneral";
 import ModalBienvenida from "./ModalBienvenida";
 import Padron from "./Padron";
 import type { Afiliado, Lider } from "./esquemas";
-import { esUsuarioSede } from "./esquemas";
+import { esRolEmpleado, esUsuarioSede } from "./esquemas";
 import Form from "./forms/afiliados/Afiliados";
 import ReporteLideresClasificacion from "./reportes/ReporteLideresClasificacion";
 import { eliminar } from "./acciones";
@@ -68,6 +69,7 @@ type Tab =
   | "Sede"
   | "Lideres"
   | "Afiliados"
+  | "Empleados"
   | "Padron"
   | "Administrativos"
   | "Mensajes";
@@ -101,6 +103,12 @@ const TAB_THEMES: Record<
     activeIconText: "text-sky-600 dark:text-sky-400",
     lineBg: "bg-sky-500 dark:bg-sky-400",
   },
+  Empleados: {
+    activeText: "text-violet-600 dark:text-violet-400",
+    activeIconBg: "bg-violet-100 dark:bg-violet-950/60",
+    activeIconText: "text-violet-600 dark:text-violet-400",
+    lineBg: "bg-violet-500 dark:bg-violet-400",
+  },
   Padron: {
     activeText: "text-teal-700 dark:text-teal-400",
     activeIconBg: "bg-teal-100 dark:bg-teal-950/60",
@@ -127,6 +135,7 @@ const TAB_ORDER: Tab[] = [
   "Sede",
   "Lideres",
   "Afiliados",
+  "Empleados",
   "Padron",
   "Administrativos",
   "Mensajes",
@@ -243,13 +252,18 @@ export default function Ver() {
 
   const padronHabilitado = configSis?.padron === true;
   const haySedeHabilitada = configSis?.hay_sede ?? true;
+  const hayEmpleadosHabilitada = configSis?.hay_empleados === true;
 
   useEffect(() => {
     if (!haySedeHabilitada && activeTab === "Sede") {
       setActiveTab("Lideres");
       prevTabRef.current = "Lideres";
     }
-  }, [haySedeHabilitada, activeTab]);
+    if (!hayEmpleadosHabilitada && activeTab === "Empleados") {
+      setActiveTab("Lideres");
+      prevTabRef.current = "Lideres";
+    }
+  }, [haySedeHabilitada, hayEmpleadosHabilitada, activeTab]);
 
   const { data: afiliados = [], isPending: isLoadingAfiliados } = useQuery({
     queryKey: ["afiliados-gl"],
@@ -302,6 +316,12 @@ export default function Ver() {
   const totalAfiliadosLideres = allUsers
     .filter((u) => (u.rol || "").toUpperCase() === "LIDER")
     .reduce((acc, u) => acc + (u.conteoAfiliados || 0), 0);
+  const empleados = allUsers.filter((u) => esRolEmpleado(u.rol));
+  const totalEmpleadosRegistrados = empleados.length;
+  const totalAfiliadosEmpleados = empleados.reduce(
+    (acc, u) => acc + (u.conteoAfiliados || 0),
+    0,
+  );
   const lugares = (dashboardData?.lugares || []) as Lugar[];
 
   const lideres = (() => {
@@ -330,9 +350,10 @@ export default function Ver() {
 
   const totalLideresRegistrados = lideresBase.length;
   const totalAdministrativosRegistrados = administrativos.length;
-  const totalMiembrosGeneral = haySedeHabilitada
-    ? totalAfiliadosSede + totalAfiliadosLideres
-    : totalAfiliadosLideres;
+  const totalMiembrosGeneral =
+    (haySedeHabilitada ? totalAfiliadosSede : 0) +
+    totalAfiliadosLideres +
+    (hayEmpleadosHabilitada ? totalAfiliadosEmpleados : 0);
 
   const cargandoLideres = isDashboardLoading;
   const cargandoMiembros = isLoadingAfiliados || cargandoLideres;
@@ -422,7 +443,10 @@ export default function Ver() {
   const cambiarTab = (tab: Tab) => {
     if (
       soloLecturaSede &&
-      (tab === "Mensajes" || tab === "Administrativos" || tab === "Padron")
+      (tab === "Mensajes" ||
+        tab === "Administrativos" ||
+        tab === "Padron" ||
+        tab === "Empleados")
     ) {
       return;
     }
@@ -538,8 +562,10 @@ export default function Ver() {
             <MetaGeneral
               totalSede={totalAfiliadosSede}
               totalLideres={totalAfiliadosLideres}
+              totalEmpleados={totalAfiliadosEmpleados}
               objetivoTotal={configSis?.objetivo_total || 0}
               mostrarSede={haySedeHabilitada}
+              mostrarEmpleados={hayEmpleadosHabilitada}
             />
             {miPerfilGlobal ? (
               <Celula
@@ -562,8 +588,10 @@ export default function Ver() {
             <MetaGeneral
               totalSede={totalAfiliadosSede}
               totalLideres={totalAfiliadosLideres}
+              totalEmpleados={totalAfiliadosEmpleados}
               objetivoTotal={configSis?.objetivo_total || 0}
               mostrarSede={haySedeHabilitada}
+              mostrarEmpleados={hayEmpleadosHabilitada}
             />
             <div className="mb-6 w-full min-w-0 bg-white dark:bg-neutral-950">
               <div className="relative w-full min-w-0 gap-0.5 md:gap-1 grid grid-cols-4 md:flex md:flex-nowrap md:items-stretch border-b border-gray-200 dark:border-neutral-700">
@@ -589,6 +617,13 @@ export default function Ver() {
                       count: totalMiembrosGeneral,
                       icon: PiUsersThreeDuotone,
                       show: true,
+                    },
+                    {
+                      id: "Empleados" as Tab,
+                      label: "Empleados",
+                      count: totalEmpleadosRegistrados,
+                      icon: PiBriefcaseDuotone,
+                      show: esAdminOSuper && hayEmpleadosHabilitada,
                     },
                     {
                       id: "Padron" as Tab,
@@ -825,6 +860,37 @@ export default function Ver() {
                       />
                     </>
                   )}
+                  {activeTab === "Empleados" &&
+                    esAdminOSuper &&
+                    hayEmpleadosHabilitada && (
+                      <>
+                        {renderBarraPestana(
+                          puedeVerBotonNuevo ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() =>
+                                handleOpenCreateUsuarioModal("EMPLEADO")
+                              }
+                              className="gap-1.5 h-10 px-3 text-sm font-semibold border-violet-500 text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/40 hover:bg-violet-100 dark:hover:bg-violet-950/60 shadow-sm w-full sm:w-auto"
+                            >
+                              <PiBriefcaseDuotone className="w-4 h-4 shrink-0" />
+                              Nuevo Empleado
+                            </Button>
+                          ) : undefined,
+                        )}
+                        <Lideres
+                          lideres={empleados}
+                          onVerCelula={handleOpenCelula}
+                          onEditar={handleOpenEditLiderModal}
+                          rolUsuarioSesion={rolSesionCelula}
+                          onDataChange={refreshAfterDeletion}
+                          searchTerm={searchTerm}
+                          idUsuarioSesion={userId}
+                          isLoading={cargandoLideres}
+                        />
+                      </>
+                    )}
                   {activeTab === "Padron" &&
                     esAdminOSuper &&
                     padronHabilitado && <Padron />}

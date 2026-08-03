@@ -77,6 +77,7 @@ export async function actualizarConfiguracionAction(
   meta_celula: number = 15,
   meta_celula_minima: number = 10,
   hay_sede: boolean = true,
+  hay_empleados: boolean = false,
 ) {
   return guardarConfiguracion({
     nombre_candidato,
@@ -88,12 +89,14 @@ export async function actualizarConfiguracionAction(
     meta_celula,
     meta_celula_minima,
     hay_sede,
+    hay_empleados,
   });
 }
 
 export async function actualizarConfiguracionSuperAction(
   padron: boolean,
   hay_sede: boolean,
+  hay_empleados: boolean,
 ) {
   const supabase = await createClient();
   const {
@@ -123,5 +126,5 @@ export async function actualizarConfiguracionSuperAction(
     throw new Error("Solo el rol SUPER puede modificar esta configuración");
   }
 
-  return guardarConfiguracion({ padron, hay_sede });
+  return guardarConfiguracion({ padron, hay_sede, hay_empleados });
 }

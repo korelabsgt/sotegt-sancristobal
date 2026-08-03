@@ -74,6 +74,7 @@ export default function ConfiguracionSistema({
   const [metaCelulaMinima, setMetaCelulaMinima] = useState(10);
   const [padronPrecargado, setPadronPrecargado] = useState(false);
   const [haySede, setHaySede] = useState(true);
+  const [hayEmpleados, setHayEmpleados] = useState(false);
   const [activeTab, setActiveTab] = useState<
     "candidato" | "metas" | "lugares" | "super"
   >("candidato");
@@ -90,6 +91,7 @@ export default function ConfiguracionSistema({
     setMetaCelulaMinima(config.meta_celula_minima ?? 10);
     setPadronPrecargado(config.padron ?? false);
     setHaySede(config.hay_sede ?? true);
+    setHayEmpleados(config.hay_empleados ?? false);
     setInitialized(true);
   }
 
@@ -418,6 +420,7 @@ export default function ConfiguracionSistema({
         metaPorLider,
         metaCelulaMinima,
         config?.hay_sede ?? true,
+        config?.hay_empleados ?? false,
       );
       queryClient.setQueryData(["config_sistema"], result);
       showSuccessToast("Metas guardadas correctamente");
@@ -431,22 +434,26 @@ export default function ConfiguracionSistema({
   };
 
   const toggleSuperOpcion = async (
-    campo: "padron" | "hay_sede",
+    campo: "padron" | "hay_sede" | "hay_empleados",
     valor: boolean,
   ) => {
     const prevPadron = padronPrecargado;
     const prevHaySede = haySede;
+    const prevHayEmpleados = hayEmpleados;
     const nextPadron = campo === "padron" ? valor : padronPrecargado;
     const nextHaySede = campo === "hay_sede" ? valor : haySede;
+    const nextHayEmpleados = campo === "hay_empleados" ? valor : hayEmpleados;
 
     if (campo === "padron") setPadronPrecargado(valor);
-    else setHaySede(valor);
+    else if (campo === "hay_sede") setHaySede(valor);
+    else setHayEmpleados(valor);
 
     setGuardandoSuper(true);
     try {
       const result = await actualizarConfiguracionSuperAction(
         nextPadron,
         nextHaySede,
+        nextHayEmpleados,
       );
       queryClient.setQueryData(["config_sistema"], (prev: typeof config) =>
         prev ? { ...prev, ...result } : result,
@@ -454,6 +461,7 @@ export default function ConfiguracionSistema({
     } catch (error: unknown) {
       setPadronPrecargado(prevPadron);
       setHaySede(prevHaySede);
+      setHayEmpleados(prevHayEmpleados);
       const mensaje =
         error instanceof Error ? error.message : "Error desconocido";
       showErrorToast("Error al guardar: " + mensaje);
@@ -729,6 +737,31 @@ export default function ConfiguracionSistema({
                   <span
                     className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition-transform ${
                       haySede ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between p-4 bg-white dark:bg-neutral-900 rounded-xl border-2 border-violet-200 dark:border-violet-700">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-xs font-black text-violet-800 dark:text-violet-300 uppercase">
+                    ¿Hay Empleados?
+                  </span>
+                  <span className="text-[10px] text-violet-500 dark:text-violet-400">
+                    Muestra la pestaña Empleados en gestión de datos
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  disabled={guardandoSuper}
+                  onClick={() => void toggleSuperOpcion("hay_empleados", !hayEmpleados)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${
+                    hayEmpleados ? "bg-violet-600" : "bg-gray-300 dark:bg-neutral-600"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition-transform ${
+                      hayEmpleados ? "translate-x-6" : "translate-x-1"
                     }`}
                   />
                 </button>
