@@ -76,6 +76,7 @@ export async function actualizarConfiguracionAction(
   padron: boolean = false,
   meta_celula: number = 15,
   meta_celula_minima: number = 10,
+  hay_sede: boolean = true,
 ) {
   return guardarConfiguracion({
     nombre_candidato,
@@ -86,5 +87,41 @@ export async function actualizarConfiguracionAction(
     padron,
     meta_celula,
     meta_celula_minima,
+    hay_sede,
   });
+}
+
+export async function actualizarConfiguracionSuperAction(
+  padron: boolean,
+  hay_sede: boolean,
+) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("No autenticado");
+  }
+
+  const { data: perfil } = await supabase
+    .from("info_perfil")
+    .select("roles(nombre)")
+    .eq("user_id", user.id)
+    .single();
+
+  const roles = perfil?.roles as
+    | { nombre?: string | null }
+    | { nombre?: string | null }[]
+    | null
+    | undefined;
+  const rol = Array.isArray(roles)
+    ? (roles[0]?.nombre || "").toUpperCase()
+    : (roles?.nombre || "").toUpperCase();
+
+  if (rol !== "SUPER") {
+    throw new Error("Solo el rol SUPER puede modificar esta configuración");
+  }
+
+  return guardarConfiguracion({ padron, hay_sede });
 }

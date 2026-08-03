@@ -16,6 +16,7 @@ import {
 import {
   Fragment,
   type ReactNode,
+  useEffect,
   useRef,
   useState,
 } from "react";
@@ -241,6 +242,14 @@ export default function Ver() {
   });
 
   const padronHabilitado = configSis?.padron === true;
+  const haySedeHabilitada = configSis?.hay_sede ?? true;
+
+  useEffect(() => {
+    if (!haySedeHabilitada && activeTab === "Sede") {
+      setActiveTab("Lideres");
+      prevTabRef.current = "Lideres";
+    }
+  }, [haySedeHabilitada, activeTab]);
 
   const { data: afiliados = [], isPending: isLoadingAfiliados } = useQuery({
     queryKey: ["afiliados-gl"],
@@ -321,7 +330,9 @@ export default function Ver() {
 
   const totalLideresRegistrados = lideresBase.length;
   const totalAdministrativosRegistrados = administrativos.length;
-  const totalMiembrosGeneral = totalAfiliadosSede + totalAfiliadosLideres;
+  const totalMiembrosGeneral = haySedeHabilitada
+    ? totalAfiliadosSede + totalAfiliadosLideres
+    : totalAfiliadosLideres;
 
   const cargandoLideres = isDashboardLoading;
   const cargandoMiembros = isLoadingAfiliados || cargandoLideres;
@@ -528,6 +539,7 @@ export default function Ver() {
               totalSede={totalAfiliadosSede}
               totalLideres={totalAfiliadosLideres}
               objetivoTotal={configSis?.objetivo_total || 0}
+              mostrarSede={haySedeHabilitada}
             />
             {miPerfilGlobal ? (
               <Celula
@@ -551,6 +563,7 @@ export default function Ver() {
               totalSede={totalAfiliadosSede}
               totalLideres={totalAfiliadosLideres}
               objetivoTotal={configSis?.objetivo_total || 0}
+              mostrarSede={haySedeHabilitada}
             />
             <div className="mb-6 w-full min-w-0 bg-white dark:bg-neutral-950">
               <div className="relative w-full min-w-0 gap-0.5 md:gap-1 grid grid-cols-4 md:flex md:flex-nowrap md:items-stretch border-b border-gray-200 dark:border-neutral-700">
@@ -561,7 +574,7 @@ export default function Ver() {
                       label: "Sede",
                       count: totalAfiliadosSede,
                       icon: PiBuildingsDuotone,
-                      show: true,
+                      show: haySedeHabilitada,
                     },
                     {
                       id: "Lideres" as Tab,

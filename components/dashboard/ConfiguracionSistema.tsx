@@ -36,6 +36,7 @@ import Swal from "sweetalert2";
 import {
   actualizarConfiguracionAction,
   actualizarConfiguracionGeneralAction,
+  actualizarConfiguracionSuperAction,
   obtenerConfiguracionAction,
 } from "./actions/configuracion";
 
@@ -53,10 +54,12 @@ export default function ConfiguracionSistema({
   const { rol, cargando: cargandoRol } = useUserData();
   const queryClient = useQueryClient();
   const [guardando, setGuardando] = useState(false);
+  const [guardandoSuper, setGuardandoSuper] = useState(false);
 
   const canEdit =
     (rol === "SUPER" || rol === "ADMINISTRADOR" || rol === "ADMIN") &&
     allowEditing;
+  const esSuper = rol === "SUPER";
 
   const { data: config, isLoading } = useQuery({
     queryKey: ["config_sistema"],
@@ -70,9 +73,10 @@ export default function ConfiguracionSistema({
   const [metaPorLider, setMetaPorLider] = useState(0);
   const [metaCelulaMinima, setMetaCelulaMinima] = useState(10);
   const [padronPrecargado, setPadronPrecargado] = useState(false);
-  const [activeTab, setActiveTab] = useState<"candidato" | "metas" | "lugares">(
-    "candidato",
-  );
+  const [haySede, setHaySede] = useState(true);
+  const [activeTab, setActiveTab] = useState<
+    "candidato" | "metas" | "lugares" | "super"
+  >("candidato");
 
   const [initialized, setInitialized] = useState(false);
 
@@ -85,6 +89,7 @@ export default function ConfiguracionSistema({
     setMetaPorLider(config.meta_por_lider || config.meta_celula || 0);
     setMetaCelulaMinima(config.meta_celula_minima ?? 10);
     setPadronPrecargado(config.padron ?? false);
+    setHaySede(config.hay_sede ?? true);
     setInitialized(true);
   }
 
@@ -409,9 +414,10 @@ export default function ConfiguracionSistema({
         frase,
         objetivoTotal,
         metaPorLider,
-        padronPrecargado,
+        config?.padron ?? false,
         metaPorLider,
         metaCelulaMinima,
+        config?.hay_sede ?? true,
       );
       queryClient.setQueryData(["config_sistema"], result);
       showSuccessToast("Metas guardadas correctamente");
@@ -421,6 +427,38 @@ export default function ConfiguracionSistema({
       showErrorToast("Error al guardar: " + mensaje);
     } finally {
       setGuardando(false);
+    }
+  };
+
+  const toggleSuperOpcion = async (
+    campo: "padron" | "hay_sede",
+    valor: boolean,
+  ) => {
+    const prevPadron = padronPrecargado;
+    const prevHaySede = haySede;
+    const nextPadron = campo === "padron" ? valor : padronPrecargado;
+    const nextHaySede = campo === "hay_sede" ? valor : haySede;
+
+    if (campo === "padron") setPadronPrecargado(valor);
+    else setHaySede(valor);
+
+    setGuardandoSuper(true);
+    try {
+      const result = await actualizarConfiguracionSuperAction(
+        nextPadron,
+        nextHaySede,
+      );
+      queryClient.setQueryData(["config_sistema"], (prev: typeof config) =>
+        prev ? { ...prev, ...result } : result,
+      );
+    } catch (error: unknown) {
+      setPadronPrecargado(prevPadron);
+      setHaySede(prevHaySede);
+      const mensaje =
+        error instanceof Error ? error.message : "Error desconocido";
+      showErrorToast("Error al guardar: " + mensaje);
+    } finally {
+      setGuardandoSuper(false);
     }
   };
 
@@ -476,6 +514,18 @@ export default function ConfiguracionSistema({
             >
               {"Lugares y\nSectores"}
             </button>
+            {esSuper && (
+              <button
+                onClick={() => setActiveTab("super")}
+                className={`flex-1 py-2 text-[10px] sm:text-xs font-bold uppercase rounded-lg transition-all ${
+                  activeTab === "super"
+                    ? "bg-white dark:bg-neutral-700 text-violet-700 dark:text-violet-300 shadow-sm"
+                    : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                }`}
+              >
+                Área Super
+              </button>
+            )}
           </div>
 
           {/* SECCIÓN 1: INFORMACIÓN DEL CANDIDATO */}
@@ -588,30 +638,6 @@ export default function ConfiguracionSistema({
                 </div>
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-white dark:bg-neutral-900 rounded-xl border-2 border-blue-200 dark:border-blue-700">
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-xs font-black text-blue-800 dark:text-blue-300 uppercase">
-                    Padrón Precargado
-                  </span>
-                  <span className="text-[10px] text-blue-500 dark:text-blue-400">
-                    Indica si el padrón electoral ya fue cargado en el sistema
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setPadronPrecargado((prev) => !prev)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
-                    padronPrecargado ? "bg-blue-600" : "bg-gray-300"
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition-transform ${
-                      padronPrecargado ? "translate-x-6" : "translate-x-1"
-                    }`}
-                  />
-                </button>
-              </div>
-
               {objetivoTotal > 0 && metaPorLider > 0 && (
                 <div className="mt-4 p-5 bg-blue-600 rounded-2xl shadow-lg flex items-center justify-between text-white">
                   <div className="flex flex-col">
@@ -641,6 +667,71 @@ export default function ConfiguracionSistema({
                     "Guardar"
                   )}
                 </Button>
+              </div>
+            </div>
+          )}
+
+          {esSuper && activeTab === "super" && (
+            <div className="bg-violet-50/50 dark:bg-violet-950/30 p-6 rounded-2xl border-2 border-violet-200 dark:border-violet-800 shadow-sm space-y-4">
+              <div className="space-y-1">
+                <h3 className="text-sm font-black text-violet-900 dark:text-violet-300 uppercase tracking-widest flex items-center gap-2">
+                  <span className="w-3 h-3 bg-violet-600 rounded-full"></span>
+                  Configuración SUPER
+                </h3>
+                <p className="text-[11px] text-violet-600 dark:text-violet-400 font-semibold ml-5">
+                  Opciones exclusivas del área SUPER. Solo usuarios con rol SUPER
+                  pueden ver y modificar esta sección.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between p-4 bg-white dark:bg-neutral-900 rounded-xl border-2 border-violet-200 dark:border-violet-700">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-xs font-black text-violet-800 dark:text-violet-300 uppercase">
+                    Padrón Precargado
+                  </span>
+                  <span className="text-[10px] text-violet-500 dark:text-violet-400">
+                    Muestra la pestaña Padrón en gestión de datos
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  disabled={guardandoSuper}
+                  onClick={() => void toggleSuperOpcion("padron", !padronPrecargado)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${
+                    padronPrecargado ? "bg-violet-600" : "bg-gray-300 dark:bg-neutral-600"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition-transform ${
+                      padronPrecargado ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between p-4 bg-white dark:bg-neutral-900 rounded-xl border-2 border-violet-200 dark:border-violet-700">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-xs font-black text-violet-800 dark:text-violet-300 uppercase">
+                    ¿Hay Sede?
+                  </span>
+                  <span className="text-[10px] text-violet-500 dark:text-violet-400">
+                    Muestra la pestaña Sede en gestión de datos
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  disabled={guardandoSuper}
+                  onClick={() => void toggleSuperOpcion("hay_sede", !haySede)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${
+                    haySede ? "bg-violet-600" : "bg-gray-300 dark:bg-neutral-600"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition-transform ${
+                      haySede ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
               </div>
             </div>
           )}

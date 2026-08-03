@@ -8,14 +8,16 @@ interface Props {
   totalSede: number;
   totalLideres: number;
   objetivoTotal?: number;
+  mostrarSede?: boolean;
 }
 
 export default function MetaGeneral({
   totalSede,
   totalLideres,
   objetivoTotal = 0,
+  mostrarSede = true,
 }: Props) {
-  const total = totalSede + totalLideres;
+  const total = mostrarSede ? totalSede + totalLideres : totalLideres;
   const objetivo = objetivoTotal > 0 ? objetivoTotal : 0;
   const pct = (n: number) =>
     objetivo > 0 ? Math.min((n / objetivo) * 100, 100) : 0;
@@ -36,24 +38,28 @@ export default function MetaGeneral({
         </span>
       </div>
       <div className="w-full bg-gray-200 dark:bg-neutral-800 rounded-full h-5 md:h-7 border-2 border-white dark:border-neutral-900 shadow-inner overflow-hidden flex items-center relative">
-        <motion.div
-          initial={{ width: 0 }}
-          animate={{ width: `${pct(totalSede)}%` }}
-          transition={{ duration: 1, ease: "easeOut" }}
-          className="bg-blue-600 h-full shrink-0"
-        />
+        {mostrarSede && (
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${pct(totalSede)}%` }}
+            transition={{ duration: 1, ease: "easeOut" }}
+            className="bg-blue-600 h-full shrink-0"
+          />
+        )}
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${pct(totalLideres)}%` }}
-          transition={{ duration: 1, ease: "easeOut", delay: 0.1 }}
+          transition={{ duration: 1, ease: "easeOut", delay: mostrarSede ? 0.1 : 0 }}
           className="bg-orange-500 h-full shrink-0"
         />
       </div>
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs md:text-sm font-bold uppercase">
-        <span className="flex items-center gap-1.5 text-blue-700 dark:text-blue-400">
-          <Building2 className="h-4 w-4 shrink-0" />
-          Sede: {totalSede.toLocaleString()}
-        </span>
+        {mostrarSede && (
+          <span className="flex items-center gap-1.5 text-blue-700 dark:text-blue-400">
+            <Building2 className="h-4 w-4 shrink-0" />
+            Sede: {totalSede.toLocaleString()}
+          </span>
+        )}
         <span className="flex items-center gap-1.5 text-orange-600 dark:text-orange-400">
           <PiMedalDuotone className="h-4 w-4 shrink-0" />
           Enlaces: {totalLideres.toLocaleString()}
