@@ -1,8 +1,8 @@
 "use client";
 
-import { Briefcase, Building2 } from "lucide-react";
+import { Building2 } from "lucide-react";
 import { motion } from "framer-motion";
-import { PiMedalDuotone } from "react-icons/pi";
+import { PiBriefcaseDuotone, PiMedalDuotone } from "react-icons/pi";
 
 interface Props {
   totalSede: number;
@@ -30,34 +30,43 @@ export default function MetaGeneral({
     objetivo > 0 ? Math.min((n / objetivo) * 100, 100) : 0;
   const progreso =
     objetivo > 0 ? Math.min((total / objetivo) * 100, 100) : 0;
+  const texto = "text-xs md:text-lg font-bold leading-snug";
 
   return (
-    <div className="mb-6 w-full space-y-3 rounded-xl border border-blue-100 dark:border-blue-900/40 bg-white dark:bg-neutral-900/60 px-4 py-4 md:px-6 md:py-5 shadow-sm">
-      <div className="flex flex-col gap-1 sm:flex-row sm:justify-between sm:items-end">
-        <span className="text-sm md:text-xl font-bold uppercase text-gray-700 dark:text-gray-300 font-sans tracking-tight">
+    <div className="mb-4 w-full rounded-xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 shadow-sm">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
+        <span
+          className={`${texto} uppercase tracking-wide text-blue-800 dark:text-blue-400`}
+        >
           Meta General de Afiliación
         </span>
-        <span className="text-base md:text-2xl font-black text-blue-700 dark:text-blue-400">
+        <span
+          className={`${texto} whitespace-nowrap text-blue-700 dark:text-blue-400`}
+        >
           {total.toLocaleString()} / {objetivo.toLocaleString()}{" "}
-          <span className="text-sm md:text-lg text-gray-500 dark:text-gray-400 font-bold">
+          <span className="text-gray-500 dark:text-gray-400">
             ({progreso.toFixed(1)}%)
           </span>
         </span>
       </div>
-      <div className="w-full bg-gray-200 dark:bg-neutral-800 rounded-full h-5 md:h-7 border-2 border-white dark:border-neutral-900 shadow-inner overflow-hidden flex items-center relative">
+      <div className="relative flex h-3 w-full items-center overflow-hidden rounded-full bg-gray-200 dark:bg-neutral-800">
         {mostrarSede && (
           <motion.div
             initial={{ width: 0 }}
             animate={{ width: `${pct(totalSede)}%` }}
             transition={{ duration: 1, ease: "easeOut" }}
-            className="bg-blue-600 h-full shrink-0"
+            className="h-full shrink-0 bg-blue-600"
           />
         )}
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${pct(totalLideres)}%` }}
-          transition={{ duration: 1, ease: "easeOut", delay: mostrarSede ? 0.1 : 0 }}
-          className="bg-orange-500 h-full shrink-0"
+          transition={{
+            duration: 1,
+            ease: "easeOut",
+            delay: mostrarSede ? 0.1 : 0,
+          }}
+          className="h-full shrink-0 bg-orange-500"
         />
         {mostrarEmpleados && (
           <motion.div
@@ -66,32 +75,35 @@ export default function MetaGeneral({
             transition={{
               duration: 1,
               ease: "easeOut",
-              delay: mostrarSede ? 0.2 : 0.1,
+              delay: mostrarSede ? 0.15 : 0.1,
             }}
-            className="bg-violet-500 h-full shrink-0"
+            className="h-full shrink-0 bg-violet-500"
           />
         )}
       </div>
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs md:text-sm font-bold uppercase">
+      <div className="mt-2.5 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 md:justify-start">
         {mostrarSede && (
-          <span className="flex items-center gap-1.5 text-blue-700 dark:text-blue-400">
-            <Building2 className="h-4 w-4 shrink-0" />
+          <span
+            className={`flex items-center gap-1.5 ${texto} uppercase text-blue-700 dark:text-blue-400`}
+          >
+            <Building2 className="size-5 shrink-0" />
             Sede: {totalSede.toLocaleString()}
           </span>
         )}
-        <span className="flex items-center gap-1.5 text-orange-600 dark:text-orange-400">
-          <PiMedalDuotone className="h-4 w-4 shrink-0" />
+        <span
+          className={`flex items-center gap-1.5 ${texto} uppercase text-orange-600 dark:text-orange-400`}
+        >
+          <PiMedalDuotone className="size-5 shrink-0" />
           Enlaces: {totalLideres.toLocaleString()}
         </span>
         {mostrarEmpleados && (
-          <span className="flex items-center gap-1.5 text-violet-600 dark:text-violet-400">
-            <Briefcase className="h-4 w-4 shrink-0" />
+          <span
+            className={`flex items-center gap-1.5 ${texto} uppercase text-violet-600 dark:text-violet-400`}
+          >
+            <PiBriefcaseDuotone className="size-5 shrink-0" />
             Empleados: {totalEmpleados.toLocaleString()}
           </span>
         )}
-        <span className="font-black text-gray-900 dark:text-gray-100 normal-case md:ml-auto">
-          Total: {total.toLocaleString()}
-        </span>
       </div>
     </div>
   );

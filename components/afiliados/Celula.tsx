@@ -26,6 +26,7 @@ import { obtenerConfiguracionAction } from "../dashboard/actions/configuracion";
 import { calcularNivelCompromiso } from "@/lib/nivelCompromiso";
 import MensajesEnviados from "./MensajesEnviados";
 import type { FormatoVista } from "./Tabla";
+import { temaDesdeLider } from "./temaPestana";
 
 function etiquetaRolCelula(lider: Lider): string {
   if (esRolEmpleado(lider.rol)) return "Empleado";
@@ -63,7 +64,7 @@ export default function Celula({
   const embedded = mode === "embedded";
   const [vistaActual, setVistaActual] = useState<Vista>("miembros");
   const [busqueda, setBusqueda] = useState("");
-  const [formatoVista, setFormatoVista] = useState<FormatoVista>("tarjetas");
+  const [formatoVista, setFormatoVista] = useState<FormatoVista>("tabla");
   const [titularFamilia, setTitularFamilia] = useState<Afiliado | null>(null);
 
   const esSimulado = !!lider?.simulado;
@@ -71,14 +72,20 @@ export default function Celula({
   const celulaEsSede = !!lider && esUsuarioSede(lider);
   const soloLectura = esSedeSesion && !celulaEsSede;
 
-  const { data: afiliadosQuery = [], isLoading: isLoadingQuery } = useQuery({
+  const { data: afiliadosQuery, isPending: isAfiliadosPending } = useQuery({
     queryKey: ["afiliados-lider", lider?.id],
     queryFn: () => obtenerAfiliadosAction(lider?.id),
     enabled: !!lider?.id && !esSimulado,
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
+    refetchOnMount: false,
   });
 
-  const afiliadosDelLider = esSimulado ? afiliadosSimulados ?? [] : afiliadosQuery;
-  const isLoading = esSimulado ? false : isLoadingQuery;
+  const afiliadosDelLider = esSimulado
+    ? afiliadosSimulados ?? []
+    : afiliadosQuery ?? [];
+  const isLoading =
+    esSimulado ? false : isAfiliadosPending && afiliadosQuery === undefined;
 
   const { data: config } = useQuery({
     queryKey: ["config_sistema"],
@@ -88,6 +95,12 @@ export default function Celula({
   if (!lider) return null;
 
   const etiquetaRol = etiquetaRolCelula(lider);
+  const tema = temaDesdeLider(lider, celulaEsSede);
+
+  const switchTrackClass =
+    "flex bg-gray-100 dark:bg-neutral-800 p-1 rounded-lg border border-gray-200 dark:border-neutral-700";
+  const switchActivoClass = tema.activeToggle;
+  const switchInactivoClass = "text-gray-500 dark:text-gray-400";
 
   const liderAfiliado =
     afiliadosDelLider.find((a: Afiliado) => !!a.es_lider) ??
@@ -139,31 +152,19 @@ export default function Celula({
   const panelBody = (
     <>
       <div className="px-3 lg:px-6 py-2 border-b border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-950 sticky top-0 z-20">
-        <div className="flex flex-col items-center gap-2 lg:flex-row lg:items-center lg:justify-between lg:gap-4 w-full">
-          {!embedded && onClose ? (
-            <div className="order-1 lg:order-1 shrink-0 w-full flex justify-center lg:w-auto lg:justify-start">
-              <button
-                type="button"
-                onClick={onClose}
-                className="text-sm font-bold text-red-600 hover:text-red-700 underline underline-offset-[6px] decoration-red-600/90 hover:decoration-red-700 uppercase tracking-wide bg-transparent border-0 cursor-pointer transition-colors"
-              >
-                Atrás
-              </button>
-            </div>
+        <div className="flex flex-row items-center gap-2 lg:gap-4 w-full min-w-0">
+          {onClose ? (
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex items-center gap-1.5 shrink-0 text-sm font-bold text-red-600 hover:text-red-700 underline underline-offset-[6px] decoration-red-600/90 hover:decoration-red-700 uppercase tracking-wide bg-transparent border-0 cursor-pointer transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">Volver</span>
+            </button>
           ) : null}
 
-          <div className="order-2 lg:order-3 w-full lg:w-auto text-center lg:text-right px-2 min-w-0 lg:shrink-0 lg:max-w-[min(100%,20rem)]">
-            <div className="flex items-center justify-center lg:justify-end gap-1">
-              <h3 className="text-sm lg:text-xs font-black uppercase text-blue-700 dark:text-blue-400 leading-tight break-words">
-                {lider.nombres} {lider.apellidos}
-              </h3>
-              {isLoading && (
-                <Loader2 className="w-4 h-4 lg:w-3 lg:h-3 animate-spin text-blue-500 dark:text-blue-400 shrink-0" />
-              )}
-            </div>
-          </div>
-
-          <div className="order-3 lg:order-2 w-full lg:flex-1 lg:max-w-md px-1">
+          <div className="flex-1 min-w-0 max-w-md mx-auto">
             <div className="flex bg-gray-200 dark:bg-neutral-800 p-1 rounded-lg gap-1 w-full">
               {TABS.map((tab) => (
                 <button
@@ -174,14 +175,25 @@ export default function Celula({
                   }}
                   className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-[10px] font-bold transition-all ${
                     vistaActual === tab.id
-                      ? "bg-white dark:bg-neutral-700 text-blue-600 dark:text-blue-400 shadow-sm"
-                      : "text-gray-500 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-neutral-600"
+                      ? switchActivoClass
+                      : switchInactivoClass + " hover:bg-gray-300 dark:hover:bg-neutral-600"
                   }`}
                 >
                   <tab.icon className="w-3.5 h-3.5 shrink-0" />
                   <span>{tab.label}</span>
                 </button>
               ))}
+            </div>
+          </div>
+
+          <div className="shrink-0 text-right px-1 min-w-0 max-w-[40%] sm:max-w-[12rem] lg:max-w-[16rem]">
+            <div className="flex items-center justify-end gap-1 min-w-0">
+              <h3 className={`text-[10px] sm:text-xs font-black uppercase leading-tight truncate ${tema.btnText}`}>
+                {lider.nombres} {lider.apellidos}
+              </h3>
+              {isLoading && (
+                <Loader2 className={`w-3 h-3 animate-spin shrink-0 ${tema.btnText}`} />
+              )}
             </div>
           </div>
         </div>
@@ -246,33 +258,33 @@ export default function Celula({
                   )}
                 </div>
 
-                <div className="flex justify-end">
-                  <div className="flex bg-gray-100 dark:bg-neutral-800 p-1 rounded-lg border border-gray-200 dark:border-neutral-700 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setFormatoVista("tarjetas")}
-                      title="Ver tarjetas"
-                      className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-[10px] font-bold uppercase transition-colors ${
-                        formatoVista === "tarjetas"
-                          ? "bg-white dark:bg-neutral-700 text-blue-600 dark:text-blue-400 shadow-sm"
-                          : "text-gray-500 dark:text-gray-400"
-                      }`}
-                    >
-                      <LayoutGrid className="w-4 h-4" />
-                      <span className="hidden sm:inline">Tarjetas</span>
-                    </button>
+                <div className="flex justify-end mb-3">
+                  <div className={`${switchTrackClass} shrink-0`}>
                     <button
                       type="button"
                       onClick={() => setFormatoVista("tabla")}
                       title="Ver lista"
                       className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-[10px] font-bold uppercase transition-colors ${
                         formatoVista === "tabla"
-                          ? "bg-white dark:bg-neutral-700 text-blue-600 dark:text-blue-400 shadow-sm"
-                          : "text-gray-500 dark:text-gray-400"
+                          ? switchActivoClass
+                          : switchInactivoClass
                       }`}
                     >
                       <Table2 className="w-4 h-4" />
                       <span className="hidden sm:inline">Lista</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormatoVista("tarjetas")}
+                      title="Ver tarjetas"
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-[10px] font-bold uppercase transition-colors ${
+                        formatoVista === "tarjetas"
+                          ? switchActivoClass
+                          : switchInactivoClass
+                      }`}
+                    >
+                      <LayoutGrid className="w-4 h-4" />
+                      <span className="hidden sm:inline">Tarjetas</span>
                     </button>
                   </div>
                 </div>
@@ -295,6 +307,7 @@ export default function Celula({
                   totalEnCelula={totalEnGrupo}
                   isFamilyView
                   formato={formatoVista}
+                  tema={tema}
                 />
               </motion.div>
             ) : (
@@ -349,92 +362,106 @@ export default function Celula({
                   </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4 w-full">
-                  <div className="relative w-full sm:max-w-md shrink-0">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Search className="h-5 w-5 text-gray-400 dark:text-neutral-500" />
+                <div
+                  className={`overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900 border-t-4 ${tema.borderTop}`}
+                >
+                  <div className="flex flex-col gap-3 border-b border-gray-100 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900 sm:flex-row sm:items-center">
+                    <div className="relative order-2 min-w-0 w-full sm:order-1 sm:min-w-[12rem] sm:flex-1">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Buscar por nombre o DPI..."
+                        className={`h-11 w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-9 pr-4 text-sm focus:outline-none focus:ring-2 dark:border-neutral-700 dark:bg-neutral-900 ${tema.focusRing}`}
+                        value={busqueda}
+                        onChange={(e) => setBusqueda(e.target.value)}
+                      />
                     </div>
-                    <input
-                      type="text"
-                      placeholder="Buscar por nombre o DPI..."
-                      className="pl-10 pr-4 py-2.5 border border-gray-300 dark:border-neutral-600 rounded-lg w-full bg-white dark:bg-neutral-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 text-sm"
-                      value={busqueda}
-                      onChange={(e) => setBusqueda(e.target.value)}
+                    <div className="order-1 flex w-full min-w-0 gap-2 sm:order-2 sm:w-auto sm:shrink-0 sm:ml-auto">
+                      <div
+                        className={`${switchTrackClass} flex h-11 w-2/3 min-w-0 items-center sm:w-auto sm:min-w-[15.5rem]`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setFormatoVista("tabla")}
+                          title="Ver lista"
+                          className={`inline-flex flex-1 items-center justify-center gap-1 rounded-md px-1.5 py-2 text-[10px] font-bold uppercase whitespace-nowrap transition-all sm:gap-2 sm:px-3 sm:text-xs ${
+                            formatoVista === "tabla"
+                              ? switchActivoClass
+                              : switchInactivoClass
+                          }`}
+                        >
+                          <Table2 className="h-4 w-4 shrink-0" />
+                          <span className="shrink-0">Lista</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormatoVista("tarjetas")}
+                          title="Ver tarjetas"
+                          className={`inline-flex flex-1 items-center justify-center gap-1 rounded-md px-1.5 py-2 text-[10px] font-bold uppercase whitespace-nowrap transition-all sm:gap-2 sm:px-3 sm:text-xs ${
+                            formatoVista === "tarjetas"
+                              ? switchActivoClass
+                              : switchInactivoClass
+                          }`}
+                        >
+                          <LayoutGrid className="h-4 w-4 shrink-0" />
+                          <span className="shrink-0">Tarjetas</span>
+                        </button>
+                      </div>
+                      {!esSimulado && !soloLectura && (
+                        <button
+                          type="button"
+                          className={`flex h-11 w-1/3 min-w-0 items-center justify-center gap-1 rounded-lg border px-1.5 text-[10px] font-semibold uppercase whitespace-nowrap transition-all duration-300 ease-in-out sm:w-auto sm:min-w-[6.5rem] sm:px-3 sm:text-xs ${
+                            totalEnGrupo === 0 && !celulaEsSede
+                              ? "border-green-500 bg-green-50 text-green-700 hover:bg-green-100 dark:border-green-500 dark:bg-green-950/50 dark:text-green-400 dark:hover:bg-green-950/70"
+                              : `${tema.btnPrimary}`
+                          }`}
+                          onClick={() =>
+                            onAnadirAfiliado(
+                              lider.id,
+                              totalEnGrupo === 0 && !celulaEsSede,
+                            )
+                          }
+                        >
+                          <UserPlus className="h-4 w-4 shrink-0" />
+                          <span className="truncate">
+                            {totalEnGrupo === 0 && !celulaEsSede
+                              ? "Registrarme"
+                              : "Añadir"}
+                          </span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div
+                    className={
+                      formatoVista === "tabla" ? "px-0 pb-0" : "p-3 pt-2"
+                    }
+                  >
+                    <p className="px-3 pt-3 mb-2 text-sm font-bold text-gray-800 dark:text-gray-200">
+                      Total:{" "}
+                      <span className={`tabular-nums ${tema.btnText}`}>
+                        {afiliadosFiltrados.length.toLocaleString()}
+                      </span>
+                    </p>
+                    <Tabla
+                      lider={lider}
+                      afiliados={afiliadosFiltrados}
+                      onEditar={onEditar}
+                      onAnadirFamiliar={(titularId) =>
+                        onAnadirAfiliado(lider.id, false, titularId)
+                      }
+                      onVerFamilia={setTitularFamilia}
+                      onDataChange={onDataChange}
+                      rolUsuarioSesion={rolUsuarioSesion}
+                      config={config}
+                      totalEnCelula={totalEnGrupo}
+                      formato={formatoVista}
+                      tema={tema}
+                      embebido={formatoVista === "tabla"}
                     />
                   </div>
-                  <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
-                    <div className="flex bg-gray-100 dark:bg-neutral-800 p-1 rounded-lg border border-gray-200 dark:border-neutral-700 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => setFormatoVista("tarjetas")}
-                        title="Ver tarjetas"
-                        className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-[10px] font-bold uppercase transition-colors ${
-                          formatoVista === "tarjetas"
-                            ? "bg-white dark:bg-neutral-700 text-blue-600 dark:text-blue-400 shadow-sm"
-                            : "text-gray-500 dark:text-gray-400"
-                        }`}
-                      >
-                        <LayoutGrid className="w-4 h-4" />
-                        <span className="hidden sm:inline">Tarjetas</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFormatoVista("tabla")}
-                        title="Ver lista"
-                        className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-[10px] font-bold uppercase transition-colors ${
-                          formatoVista === "tabla"
-                            ? "bg-white dark:bg-neutral-700 text-blue-600 dark:text-blue-400 shadow-sm"
-                            : "text-gray-500 dark:text-gray-400"
-                        }`}
-                      >
-                        <Table2 className="w-4 h-4" />
-                        <span className="hidden sm:inline">Lista</span>
-                      </button>
-                    </div>
-                    {!esSimulado && !soloLectura && (
-                      <Button
-                        variant="outline"
-                        className={`gap-2 font-bold h-11 sm:h-12 px-4 sm:px-6 shadow-none flex-1 sm:flex-none uppercase text-xs shrink-0 backdrop-blur-sm transition-colors ${
-                          totalEnGrupo === 0 && !celulaEsSede
-                            ? "border-green-500 dark:border-green-600 text-green-700 dark:text-green-400 bg-white/70 dark:bg-white/5 hover:bg-green-100 dark:hover:bg-green-950/55 animate-pulse"
-                            : "border-blue-500 dark:border-blue-600 text-blue-700 dark:text-blue-400 bg-blue-50/90 dark:bg-blue-950/45 hover:bg-blue-100 dark:hover:bg-blue-950/65"
-                        }`}
-                        onClick={() =>
-                          onAnadirAfiliado(
-                            lider.id,
-                            totalEnGrupo === 0 && !celulaEsSede,
-                          )
-                        }
-                      >
-                        {totalEnGrupo === 0 && !celulaEsSede ? (
-                          <>
-                            <UserPlus className="w-5 h-5" /> Registrarme como{" "}
-                            {etiquetaRol}
-                          </>
-                        ) : (
-                          <>
-                            <UserPlus className="w-5 h-5" /> Añadir Integrante
-                          </>
-                        )}
-                      </Button>
-                    )}
-                  </div>
                 </div>
-
-                <Tabla
-                  lider={lider}
-                  afiliados={afiliadosFiltrados}
-                  onEditar={onEditar}
-                  onAnadirFamiliar={(titularId) =>
-                    onAnadirAfiliado(lider.id, false, titularId)
-                  }
-                  onVerFamilia={setTitularFamilia}
-                  onDataChange={onDataChange}
-                  rolUsuarioSesion={rolUsuarioSesion}
-                  config={config}
-                  totalEnCelula={totalEnGrupo}
-                  formato={formatoVista}
-                />
               </motion.div>
             )}
             </AnimatePresence>

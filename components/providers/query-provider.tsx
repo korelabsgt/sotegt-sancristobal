@@ -2,12 +2,13 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
+import SessionCacheSync from "./SessionCacheSync";
 
 export default function QueryProvider({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: 60 * 1000, // 1 minuto
+        staleTime: 60 * 1000,
         refetchOnWindowFocus: false,
       },
     },
@@ -15,6 +16,7 @@ export default function QueryProvider({ children }: { children: React.ReactNode 
 
   return (
     <QueryClientProvider client={queryClient}>
+      <SessionCacheSync />
       {children}
     </QueryClientProvider>
   );

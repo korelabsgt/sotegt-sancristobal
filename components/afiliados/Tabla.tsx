@@ -15,6 +15,7 @@ import {
   IdCard,
   Download,
   Users,
+  MoreVertical,
 } from "lucide-react";
 
 import { eliminar } from "./acciones";
@@ -24,6 +25,15 @@ import GestionDpiModal from "./GestionDpiModal";
 import CarnetAfiliacion from "./CarnetAfiliacion";
 import { formatearDpi, TelefonoInline } from "./contacto";
 import { etiquetaEdadNacimiento } from "./fechaNacimiento";
+import type { TemaLista } from "./temaPestana";
+import { TEMA_SEDE } from "./temaPestana";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export type FormatoVista = "tarjetas" | "tabla";
 
@@ -39,6 +49,8 @@ interface Props {
   totalEnCelula?: number;
   isFamilyView?: boolean;
   formato?: FormatoVista;
+  tema?: TemaLista;
+  embebido?: boolean;
 }
 
 export default function Tabla({
@@ -53,6 +65,8 @@ export default function Tabla({
   totalEnCelula,
   isFamilyView = false,
   formato = "tarjetas",
+  tema = TEMA_SEDE,
+  embebido = false,
 }: Props) {
   const esSedeSesion = (rolUsuarioSesion || "").toUpperCase() === "SEDE";
   const soloLectura = esSedeSesion && !esUsuarioSede(lider);
@@ -133,39 +147,45 @@ export default function Tabla({
   if (formato === "tabla") {
     return (
       <>
-        <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-neutral-700">
+        <div
+          className={
+            embebido
+              ? "overflow-x-auto"
+              : "overflow-x-auto rounded-lg border border-gray-200 dark:border-neutral-700"
+          }
+        >
           <table className="min-w-full bg-white dark:bg-neutral-900 text-xs">
-            <thead className="bg-gray-100 dark:bg-neutral-800">
+            <thead
+              className={`${tema.theadBg} ${tema.theadText}${embebido ? " border-b border-black/5 dark:border-white/10" : ""}`}
+            >
               <tr>
-                <th className="px-3 py-2 text-left font-bold text-gray-600 dark:text-gray-300 uppercase">
+                <th className={`px-3 py-2.5 text-left font-bold uppercase ${tema.theadText}`}>
                   No.
                 </th>
-                <th className="px-3 py-2 text-left font-bold text-gray-600 dark:text-gray-300 uppercase">
+                <th className={`px-3 py-2.5 text-left font-bold uppercase ${tema.theadText}`}>
                   Nombre
                 </th>
-                <th className="px-3 py-2 text-left font-bold text-gray-600 dark:text-gray-300 uppercase">
+                <th className={`px-3 py-2.5 text-left font-bold uppercase ${tema.theadText}`}>
                   DPI
                 </th>
-                <th className="px-3 py-2 text-left font-bold text-gray-600 dark:text-gray-300 uppercase">
+                <th className={`px-3 py-2.5 text-left font-bold uppercase ${tema.theadText}`}>
                   Teléfono
                 </th>
-                <th className="px-3 py-2 text-left font-bold text-gray-600 dark:text-gray-300 uppercase">
+                <th className={`px-3 py-2.5 text-left font-bold uppercase ${tema.theadText}`}>
                   Edad
                 </th>
-                <th className="px-3 py-2 text-left font-bold text-gray-600 dark:text-gray-300 uppercase">
+                <th className={`px-3 py-2.5 text-left font-bold uppercase ${tema.theadText}`}>
                   Sexo
                 </th>
-                <th className="px-3 py-2 text-left font-bold text-gray-600 dark:text-gray-300 uppercase">
+                <th className={`px-3 py-2.5 text-left font-bold uppercase ${tema.theadText}`}>
                   Ubicación
                 </th>
-                <th className="px-3 py-2 text-left font-bold text-gray-600 dark:text-gray-300 uppercase">
+                <th className={`px-3 py-2.5 text-left font-bold uppercase ${tema.theadText}`}>
                   Padrón
                 </th>
-                {puedeEditar && (
-                  <th className="px-3 py-2 text-right font-bold text-gray-600 dark:text-gray-300 uppercase">
-                    Acciones
-                  </th>
-                )}
+                <th className={`px-3 py-2.5 text-right font-bold uppercase ${tema.theadText}`}>
+                  Acciones
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-neutral-700">
@@ -175,9 +195,9 @@ export default function Tabla({
                 return (
                   <tr
                     key={afiliado.id}
-                    className={`hover:bg-gray-50 dark:hover:bg-neutral-800/50 ${
+                    className={`${tema.filaHover} ${
                       esLider
-                        ? "bg-orange-50/70 dark:bg-orange-950/30"
+                        ? tema.theadBg
                         : afiliado.familiar_de
                           ? "bg-purple-50/40 dark:bg-purple-950/20"
                           : ""
@@ -194,7 +214,10 @@ export default function Tabla({
                       {afiliado.dpi ? formatearDpi(afiliado.dpi) : "—"}
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap normal-case">
-                      <TelefonoInline telefono={afiliado.telefono || ""} />
+                      <TelefonoInline
+                        telefono={afiliado.telefono || ""}
+                        pillClassName={tema.telefonoPill}
+                      />
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap font-bold">
                       {calcularEdad(afiliado.nacimiento)}
@@ -223,38 +246,74 @@ export default function Tabla({
                         </span>
                       )}
                     </td>
-                    {puedeEditar && (
-                      <td className="px-3 py-2 whitespace-nowrap text-right">
-                        <div className="inline-flex items-center gap-1">
+                    <td className="px-3 py-2 whitespace-nowrap text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
                           <button
                             type="button"
+                            className={`inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors ${tema.btnText}`}
+                            aria-label="Acciones"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          {!afiliado.familiar_de &&
+                            !isFamilyView &&
+                            onVerFamilia && (
+                              <DropdownMenuItem
+                                className="cursor-pointer gap-2"
+                                onClick={() => onVerFamilia(afiliado)}
+                              >
+                                <Users className="h-4 w-4" />
+                                Familia (
+                                {familiaresPorTitular.get(afiliado.id)?.length ||
+                                  0}
+                                )
+                              </DropdownMenuItem>
+                            )}
+                          <DropdownMenuItem
+                            className="cursor-pointer gap-2"
                             onClick={() => setAfiliadoCarnet(afiliado)}
-                            className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-[10px] font-bold uppercase text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/40"
-                            title="Carnet"
                           >
-                            <Download className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onEditar(afiliado)}
-                            className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-[10px] font-bold uppercase text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-neutral-800"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                            Editar
-                          </button>
-                          <button
-                            type="button"
-                            disabled={!puedeEliminar}
-                            onClick={() =>
-                              puedeEliminar && eliminar(afiliado, onDataChange)
-                            }
-                            className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-[10px] font-bold uppercase text-red-600 hover:bg-red-50 disabled:opacity-40 dark:text-red-400 dark:hover:bg-red-950/40"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    )}
+                            <Download className="h-4 w-4" />
+                            Carnet
+                          </DropdownMenuItem>
+                          {puedeEditar && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="cursor-pointer gap-2"
+                                onClick={() =>
+                                  setGestionDpiAfiliado(afiliado)
+                                }
+                              >
+                                <IdCard className="h-4 w-4" />
+                                {obtenerDpiInfo(afiliado).label}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="cursor-pointer gap-2"
+                                onClick={() => onEditar(afiliado)}
+                              >
+                                <Pencil className="h-4 w-4" />
+                                Editar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="cursor-pointer gap-2 text-red-600 focus:text-red-600"
+                                disabled={!puedeEliminar}
+                                onClick={() =>
+                                  puedeEliminar &&
+                                  eliminar(afiliado, onDataChange)
+                                }
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                Eliminar
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
                   </tr>
                 );
               })}
@@ -289,13 +348,13 @@ export default function Tabla({
           return (
             <div
               key={afiliado.id}
-              className={`group relative border rounded-2xl flex flex-col overflow-visible min-w-0 ${
+              className={`group relative border rounded-2xl flex flex-col overflow-visible min-w-0 border-l-4 border-r-4 border-l-gray-200 border-r-gray-200 dark:border-l-neutral-700 dark:border-r-neutral-700 transition-all duration-300 ease-in-out ${tema.hoverBordeLateral} ${
                 esLider
-                  ? "border-orange-300 dark:border-orange-700 bg-gradient-to-br from-white to-orange-50/40 dark:from-neutral-900 dark:to-orange-950/40 ring-1 ring-orange-200/50 dark:ring-orange-900/50"
+                  ? "bg-gradient-to-br from-white to-orange-50/40 dark:from-neutral-900 dark:to-orange-950/40"
                   : esFamiliar
-                    ? "border-purple-200 dark:border-purple-800 bg-gradient-to-br from-white to-purple-50/40 dark:from-neutral-900 dark:to-purple-950/40"
-                    : "border-slate-200 dark:border-neutral-700 bg-gradient-to-br from-white to-slate-50/40 dark:from-neutral-900 dark:to-neutral-800/60 hover:border-blue-300 dark:hover:border-blue-600"
-              } ${depth > 0 ? "ml-8 md:ml-12 border-l-4 border-l-purple-500 rounded-l-none" : ""}`}
+                    ? "bg-gradient-to-br from-white to-purple-50/40 dark:from-neutral-900 dark:to-purple-950/40"
+                    : "bg-gradient-to-br from-white to-slate-50/40 dark:from-neutral-900 dark:to-neutral-800/60"
+              } ${depth > 0 ? "ml-8 md:ml-12 rounded-l-none" : ""}`}
             >
               {esLider && (
                 <div className="absolute -top-2.5 left-3 z-10">

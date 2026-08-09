@@ -10,7 +10,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Check, ChevronUp } from "lucide-react";
+import { ChevronUp, X } from "lucide-react";
 import { toast } from "@/lib/toast";
 import PasswordSection from "@/components/admin/sign-up/PasswordSection";
 import useUserData from "@/hooks/sesion/useUserData";
@@ -29,6 +29,7 @@ interface RolDisponible {
   id: number;
   nombre: string;
 }
+
 interface SignupFormProps {
   onSuccess: () => void;
   onClose: () => void;
@@ -39,74 +40,63 @@ interface SignupFormProps {
   rolInicial?: "LIDER" | "EMPLEADO" | "ADMIN" | "SUPER" | null;
 }
 
-type RolVisual = {
-  label: string;
+type AcentoVisual = {
   Icon: IconType;
-  text: string;
-  border: string;
-  bg: string;
-  check: string;
+  accent: string;
+  accentSoft: string;
+  ring: string;
+  btn: string;
 };
 
-function estiloRol(nombreRaw: string): RolVisual {
-  const nombre = nombreRaw.toUpperCase();
-  if (nombre === "LIDER" || nombre === "LÍDER") {
+function acentoPorContexto(
+  modoCrearSede: boolean,
+  editandoSede: boolean,
+  rolInicial: SignupFormProps["rolInicial"],
+  rolNombre?: string,
+): AcentoVisual {
+  const nombre = (rolNombre || rolInicial || "").toUpperCase();
+  if (modoCrearSede || editandoSede || nombre === "SEDE") {
     return {
-      label: "Enlace",
-      Icon: PiMedalDuotone,
-      text: "text-orange-600 dark:text-orange-400",
-      border: "border-orange-400 dark:border-orange-500",
-      bg: "bg-orange-50 dark:bg-orange-950/40",
-      check: "text-orange-600 dark:text-orange-400",
+      Icon: PiBuildingsDuotone,
+      accent: "text-blue-700 dark:text-blue-400",
+      accentSoft: "bg-blue-50 dark:bg-blue-950/40",
+      ring: "focus-visible:ring-blue-500/30",
+      btn: "bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500",
     };
   }
   if (nombre === "EMPLEADO" || nombre === "TRABAJADOR") {
     return {
-      label: "Empleado",
       Icon: PiBriefcaseDuotone,
-      text: "text-violet-600 dark:text-violet-400",
-      border: "border-violet-400 dark:border-violet-500",
-      bg: "bg-violet-50 dark:bg-violet-950/40",
-      check: "text-violet-600 dark:text-violet-400",
+      accent: "text-violet-700 dark:text-violet-400",
+      accentSoft: "bg-violet-50 dark:bg-violet-950/40",
+      ring: "focus-visible:ring-violet-500/30",
+      btn: "bg-violet-600 hover:bg-violet-700 dark:bg-violet-600 dark:hover:bg-violet-500",
     };
   }
   if (nombre === "ADMIN" || nombre === "ADMINISTRADOR") {
     return {
-      label: "Admin",
       Icon: PiShieldCheckDuotone,
-      text: "text-indigo-600 dark:text-indigo-400",
-      border: "border-indigo-400 dark:border-indigo-500",
-      bg: "bg-indigo-50 dark:bg-indigo-950/40",
-      check: "text-indigo-600 dark:text-indigo-400",
+      accent: "text-emerald-700 dark:text-emerald-400",
+      accentSoft: "bg-emerald-50 dark:bg-emerald-950/40",
+      ring: "focus-visible:ring-emerald-500/30",
+      btn: "bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500",
     };
   }
   if (nombre === "SUPER") {
     return {
-      label: "Super",
       Icon: PiCodeDuotone,
-      text: "text-emerald-600 dark:text-emerald-400",
-      border: "border-emerald-400 dark:border-emerald-500",
-      bg: "bg-emerald-50 dark:bg-emerald-950/40",
-      check: "text-emerald-600 dark:text-emerald-400",
-    };
-  }
-  if (nombre === "SEDE") {
-    return {
-      label: "Sede",
-      Icon: PiBuildingsDuotone,
-      text: "text-blue-600 dark:text-blue-400",
-      border: "border-blue-400 dark:border-blue-500",
-      bg: "bg-blue-50 dark:bg-blue-950/40",
-      check: "text-blue-600 dark:text-blue-400",
+      accent: "text-neutral-900 dark:text-neutral-100",
+      accentSoft: "bg-neutral-100 dark:bg-neutral-800",
+      ring: "focus-visible:ring-neutral-500/30",
+      btn: "bg-neutral-900 hover:bg-black dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-white",
     };
   }
   return {
-    label: nombreRaw,
-    Icon: PiShieldCheckDuotone,
-    text: "text-gray-700 dark:text-gray-200",
-    border: "border-gray-300 dark:border-neutral-600",
-    bg: "bg-gray-50 dark:bg-neutral-800",
-    check: "text-gray-600 dark:text-gray-300",
+    Icon: PiMedalDuotone,
+    accent: "text-orange-700 dark:text-orange-400",
+    accentSoft: "bg-orange-50 dark:bg-orange-950/40",
+    ring: "focus-visible:ring-orange-500/30",
+    btn: "bg-orange-600 hover:bg-orange-700 dark:bg-orange-600 dark:hover:bg-orange-500",
   };
 }
 
@@ -268,41 +258,41 @@ export function SignupForm({
     return () => clearTimeout(timer);
   }, [modoSimulacion]);
 
-  const esSuperSesion = rolUsuarioSesion?.toUpperCase() === "SUPER";
-  const rolFijoDesdeMenu =
-    Boolean(rolInicial) &&
-    !isEdit &&
-    !(rolInicial === "SUPER" && !esSuperSesion);
   const editandoSede =
     isEdit &&
     ((initialData?.rol || "").toUpperCase() === "SEDE" ||
       Number(initialData?.rol_id) === 5);
-  const rolSoloLectura =
-    (!isEdit && (modoCrearSede || rolFijoDesdeMenu)) || editandoSede;
-  const rolesParaSelector = rolesDisponibles.filter((r) => {
-    const nombre = r.nombre.toUpperCase().trim();
-    if (nombre === "DOCUMENTADOR") return false;
-    if (!esSuperSesion && nombre === "SUPER") return false;
-    if (modoCrearSede || editandoSede) return nombre === "SEDE";
-    if (rolFijoDesdeMenu) {
-      if (rolInicial === "EMPLEADO") {
-        return nombre === "EMPLEADO" || nombre === "TRABAJADOR";
-      }
-      if (rolInicial === "ADMIN") return nombre === "ADMIN";
-      if (rolInicial === "SUPER") return nombre === "SUPER";
-      return nombre === "LIDER" || nombre === "LÍDER";
-    }
-    return nombre !== "SEDE";
-  });
 
-  const tituloCreacion =
-    rolInicial === "EMPLEADO"
-      ? "Nuevo Usuario Empleado"
-      : rolInicial === "ADMIN"
-        ? "Nuevo Usuario Admin"
-        : rolInicial === "SUPER"
-          ? "Nuevo Usuario Super"
-          : "Nuevo Usuario Enlace";
+  const rolSeleccionado = rolesDisponibles.find(
+    (r) => r.id.toString() === rol_id,
+  );
+
+  const titulo =
+    isEdit
+      ? editandoSede
+        ? "Editar Usuario Sede"
+        : "Editar acceso"
+      : modoCrearSede
+        ? "Crear Usuario Sede"
+        : modoSimulacion
+          ? "Nuevo Enlace (simulación)"
+          : rolInicial === "EMPLEADO"
+            ? "Nuevo Empleado"
+            : rolInicial === "ADMIN"
+              ? "Nuevo Admin"
+              : rolInicial === "SUPER"
+                ? "Nuevo Super"
+                : "Nuevo Enlace";
+
+  const acento = acentoPorContexto(
+    modoCrearSede,
+    editandoSede,
+    rolInicial,
+    rolSeleccionado?.nombre || initialData?.rol,
+  );
+  const HeaderIcon = acento.Icon;
+
+  const inputClass = `h-11 rounded-xl border-gray-200 bg-white text-sm text-gray-900 shadow-none transition-shadow dark:border-neutral-700 dark:bg-neutral-900 dark:text-gray-100 ${acento.ring}`;
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -344,65 +334,43 @@ export function SignupForm({
     }
   };
 
-  const renderRolCard = (r: RolDisponible) => {
-    const visual = estiloRol(r.nombre);
-    const seleccionado = rol_id === r.id.toString();
-    const Icon = visual.Icon;
-    return (
-      <button
-        key={r.id}
-        type="button"
-        disabled={rolSoloLectura}
-        onClick={() => {
-          if (!rolSoloLectura) setRolId(r.id.toString());
-        }}
-        className={`flex items-center gap-2.5 w-full rounded-lg border px-3 py-2.5 text-left transition-colors ${
-          seleccionado
-            ? `${visual.bg} ${visual.border}`
-            : "border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 hover:bg-gray-50 dark:hover:bg-neutral-800"
-        } ${rolSoloLectura ? "cursor-default" : "cursor-pointer"}`}
-      >
-        <Icon className={`w-5 h-5 shrink-0 ${visual.text}`} />
-        <span
-          className={`flex-1 text-sm ${
-            seleccionado ? visual.text : "text-gray-800 dark:text-gray-100"
-          }`}
-        >
-          {visual.label}
-        </span>
-        {seleccionado && (
-          <Check className={`w-4 h-4 shrink-0 ${visual.check}`} />
-        )}
-      </button>
-    );
-  };
-
   return (
-    <div className="flex flex-col w-full mx-auto md:max-w-xl gap-4 relative text-left">
-      <div className="flex justify-between items-center border-b border-gray-200 dark:border-neutral-800 pb-3">
-        <h3 className="text-xl font-bold text-blue-700 dark:text-blue-400">
-          {isEdit
-            ? "Editar Perfil de Acceso"
-            : modoCrearSede
-              ? "Crear Usuario Sede"
-              : modoSimulacion
-                ? `${tituloCreacion} (Simulación)`
-                : tituloCreacion}
-        </h3>
+    <div className="relative mx-auto flex w-full flex-col gap-5 text-left md:max-w-xl">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <span
+            className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${acento.accentSoft} ${acento.accent}`}
+          >
+            <HeaderIcon className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <h3
+              className={`text-lg font-black tracking-tight md:text-xl ${acento.accent}`}
+            >
+              {titulo}
+            </h3>
+            <p className="mt-0.5 text-xs text-gray-500 dark:text-neutral-400">
+              {isEdit
+                ? "Actualiza los datos de acceso del usuario"
+                : "Completa los datos para crear el acceso"}
+            </p>
+          </div>
+        </div>
         <button
           type="button"
           onClick={onClose}
-          className="shrink-0 bg-transparent border-0 p-0 cursor-pointer text-sm font-bold text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 underline underline-offset-2 decoration-red-600/90 dark:decoration-red-400/90 uppercase tracking-wide"
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-neutral-800 dark:hover:text-gray-200"
+          aria-label="Cerrar"
         >
-          Cerrar
+          <X className="h-4 w-4" />
         </button>
       </div>
 
       {mostrarSkeleton ? (
-        <div className="flex flex-col gap-4 animate-pulse">
-          <div className="h-12 w-full bg-gray-100 dark:bg-neutral-800 rounded" />
-          <div className="h-12 w-full bg-gray-100 dark:bg-neutral-800 rounded" />
-          <div className="h-12 w-full bg-gray-100 dark:bg-neutral-800 rounded" />
+        <div className="flex animate-pulse flex-col gap-4">
+          <div className="h-11 w-full rounded-xl bg-gray-100 dark:bg-neutral-800" />
+          <div className="h-11 w-full rounded-xl bg-gray-100 dark:bg-neutral-800" />
+          <div className="h-11 w-full rounded-xl bg-gray-100 dark:bg-neutral-800" />
           <p className="text-center text-sm font-semibold text-blue-600 dark:text-blue-400">
             Cargando datos de simulación...
           </p>
@@ -413,9 +381,11 @@ export function SignupForm({
           onSubmit={handleSubmit}
           noValidate
         >
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <Label className="text-gray-900 dark:text-gray-100">
+          <input type="hidden" name="rol_id" value={rol_id} />
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-neutral-400">
                 Nombres
               </Label>
               <Input
@@ -423,11 +393,11 @@ export function SignupForm({
                 value={nombres}
                 onChange={(e) => setNombres(e.target.value)}
                 readOnly={modoCrearSede}
-                className="h-12 text-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-neutral-600"
+                className={inputClass}
               />
             </div>
-            <div className="flex-1">
-              <Label className="text-gray-900 dark:text-gray-100">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-neutral-400">
                 Apellidos
               </Label>
               <Input
@@ -435,13 +405,13 @@ export function SignupForm({
                 value={apellidos}
                 onChange={(e) => setApellidos(e.target.value)}
                 readOnly={modoCrearSede}
-                className="h-12 text-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-neutral-600"
+                className={inputClass}
               />
             </div>
           </div>
 
-          <div>
-            <Label className="text-gray-900 dark:text-gray-100">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-neutral-400">
               Usuario de acceso
             </Label>
             <Input
@@ -452,52 +422,32 @@ export function SignupForm({
                 setEmail(e.target.value.replace(/@.*$/, "").replace(/\s/g, ""))
               }
               readOnly={modoCrearSede}
-              placeholder="Ingrese su usuario"
-              className="h-12 text-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-neutral-600"
+              placeholder="usuario"
+              className={inputClass}
             />
           </div>
 
-          <div>
-            <Label className="text-gray-900 dark:text-gray-100">
-              Asignar Rol
-            </Label>
-            <input type="hidden" name="rol_id" value={rol_id} />
-            {rolSoloLectura ? (
-              <div className="mt-1">
-                {rolesParaSelector.map((r) => renderRolCard(r))}
-              </div>
-            ) : (
-              <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {rolesParaSelector.map((r) => renderRolCard(r))}
-              </div>
-            )}
-          </div>
-
-          <div className="border border-gray-200 dark:border-neutral-700 rounded-md bg-gray-50 dark:bg-neutral-800/60 py-2 px-2">
+          <div className="rounded-2xl border border-gray-200 bg-gray-50/80 p-3 dark:border-neutral-800 dark:bg-neutral-900/50 md:p-4">
             {isEdit ? (
               <button
                 type="button"
                 onClick={() => setShowPasswordAccordion(!showPasswordAccordion)}
-                className="flex items-center justify-between w-full text-blue-700 dark:text-blue-400 font-semibold px-1 py-1 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
+                className={`mb-1 flex w-full items-center justify-between gap-2 rounded-xl px-1 py-1 text-sm font-semibold transition-colors ${acento.accent}`}
               >
-                <span
-                  className={
-                    showPasswordAccordion ? "" : "underline underline-offset-2"
-                  }
-                >
+                <span>
                   {showPasswordAccordion
-                    ? "Ingresa los datos de la contraseña"
-                    : "Click aquí para cambiar contraseña"}
+                    ? "Datos de contraseña"
+                    : "Cambiar contraseña"}
                 </span>
                 <ChevronUp
-                  className={`w-5 h-5 shrink-0 transition-transform duration-300 ${
+                  className={`h-4 w-4 shrink-0 transition-transform duration-300 ${
                     showPasswordAccordion ? "rotate-0" : "rotate-180"
                   }`}
                 />
               </button>
             ) : (
-              <h4 className="font-bold text-gray-700 dark:text-neutral-200 px-1">
-                Configurar Seguridad
+              <h4 className="mb-3 px-0.5 text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-neutral-300">
+                Seguridad
               </h4>
             )}
 
@@ -508,7 +458,11 @@ export function SignupForm({
             >
               <div className="overflow-hidden">
                 <div
-                  className={`${isEdit ? "pt-3" : "pt-2"} ${!isEdit || showPasswordAccordion ? "opacity-100" : "opacity-0"} transition-opacity duration-300`}
+                  className={`${isEdit ? "pt-2" : ""} ${
+                    !isEdit || showPasswordAccordion
+                      ? "opacity-100"
+                      : "opacity-0"
+                  } transition-opacity duration-300`}
                 >
                   <PasswordSection
                     password={password}
@@ -524,17 +478,17 @@ export function SignupForm({
           <Button
             type="submit"
             disabled={!formularioValido || loading}
-            className="h-14 text-xl w-full bg-blue-700 hover:bg-blue-800 dark:bg-blue-600 dark:hover:bg-blue-500 text-white"
+            className={`h-12 w-full rounded-xl text-base font-bold text-white shadow-sm ${acento.btn}`}
           >
             {loading
               ? "Procesando..."
               : isEdit
-                ? "Actualizar Datos"
+                ? "Guardar cambios"
                 : modoCrearSede
                   ? "Crear Sede"
                   : modoSimulacion
-                    ? "Simular Creación"
-                    : "Crear Acceso"}
+                    ? "Simular creación"
+                    : "Crear acceso"}
           </Button>
         </form>
       )}

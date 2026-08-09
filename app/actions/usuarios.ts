@@ -6,6 +6,38 @@ import supabaseAdmin from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { invalidateCachedAuthUsers } from "@/components/afiliados/actions/cache";
 
+async function obtenerRolSesionNombre(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+): Promise<string> {
+  const { data } = await supabase
+    .from("info_perfil")
+    .select("roles(nombre)")
+    .eq("user_id", userId)
+    .maybeSingle();
+  const roles = data?.roles as { nombre?: string } | { nombre?: string }[] | null;
+  if (Array.isArray(roles)) return (roles[0]?.nombre || "").toUpperCase();
+  return (roles?.nombre || "").toUpperCase();
+}
+
+async function obtenerNombreRolPorId(rolId: number): Promise<string> {
+  const { data } = await supabaseAdmin
+    .from("roles")
+    .select("nombre")
+    .eq("id", rolId)
+    .maybeSingle();
+  return (data?.nombre || "").toUpperCase().trim();
+}
+
+function esRolLiderOEmpleadoNombre(nombre: string): boolean {
+  return (
+    nombre === "LIDER" ||
+    nombre === "LÍDER" ||
+    nombre === "EMPLEADO" ||
+    nombre === "TRABAJADOR"
+  );
+}
+
 export const deleteUserAccountAction = async (userId: string) => {
   if (!userId) return { error: "ID de usuario no proporcionado." };
 
@@ -14,8 +46,21 @@ export const deleteUserAccountAction = async (userId: string) => {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (user?.id && user.id === userId) {
+    if (!user?.id) return { error: "Sesión no válida." };
+    if (user.id === userId) {
       return { error: "No puedes eliminar tu propio perfil." };
+    }
+
+    const rolSesion = await obtenerRolSesionNombre(supabase, user.id);
+    if (rolSesion === "SEDE") {
+      return { error: "El usuario Sede no puede eliminar cuentas." };
+    }
+    if (
+      rolSesion !== "ADMIN" &&
+      rolSesion !== "ADMINISTRADOR" &&
+      rolSesion !== "SUPER"
+    ) {
+      return { error: "No tienes permiso para eliminar usuarios." };
     }
 
     await supabaseAdmin.from("logs").delete().eq("user_id", userId);
@@ -66,6 +111,43 @@ export const updateUsuarioAction = async (formData: FormData) => {
       : undefined;
 
   if (!id) return { error: "ID de usuario no proporcionado." };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user?.id) return { error: "Sesión no válida." };
+
+  const rolSesion = await obtenerRolSesionNombre(supabase, user.id);
+  const rolObjetivo = await obtenerNombreRolPorId(parseInt(rol_id, 10));
+
+  if (rolSesion === "SEDE") {
+    const { data: perfilActual } = await supabaseAdmin
+      .from("info_perfil")
+      .select("roles(nombre)")
+      .eq("user_id", id)
+      .maybeSingle();
+    const rolesActual = perfilActual?.roles as
+      | { nombre?: string }
+      | { nombre?: string }[]
+      | null;
+    const rolActual = (
+      (Array.isArray(rolesActual)
+        ? rolesActual[0]?.nombre
+        : rolesActual?.nombre) || ""
+    )
+      .toUpperCase()
+      .trim();
+
+    if (
+      !esRolLiderOEmpleadoNombre(rolActual) ||
+      !esRolLiderOEmpleadoNombre(rolObjetivo)
+    ) {
+      return {
+        error: "El usuario Sede solo puede editar enlaces y empleados.",
+      };
+    }
+  }
 
   const perfilUpdate: {
     nombres: string;
@@ -119,12 +201,23 @@ export const signUpAction = async (formData: FormData) => {
 
   const supabase = await createClient();
 
-  // Validamos solo los campos que quedaron
   if (!email || !password || !rol_id || !nombres || !apellidos) {
     return { error: "Todos los campos son obligatorios." };
   }
 
-  // Ya no verificamos DPI aquí porque el líder lo registrará en la tabla afiliados después
+  const {
+    data: { user: sesion },
+  } = await supabase.auth.getUser();
+  if (!sesion?.id) return { error: "Sesión no válida." };
+
+  const rolSesion = await obtenerRolSesionNombre(supabase, sesion.id);
+  const rolObjetivo = await obtenerNombreRolPorId(parseInt(rol_id, 10));
+
+  if (rolSesion === "SEDE" && !esRolLiderOEmpleadoNombre(rolObjetivo)) {
+    return {
+      error: "El usuario Sede solo puede crear enlaces y empleados.",
+    };
+  }
 
   const { data, error } = await supabaseAdmin.auth.admin.createUser({
     email,

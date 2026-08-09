@@ -34,7 +34,7 @@ export default function CelulaPage() {
   const [familiarDeIdParaNuevo, setFamiliarDeIdParaNuevo] = useState<string | null>(null);
   const [isFirstMemberAddition, setIsFirstMemberAddition] = useState(false);
 
-  const { data: dashboardData, isLoading: isDashboardLoading } = useQuery({
+  const { data: dashboardData, isPending: isDashboardPending } = useQuery({
     queryKey: ["dashboard-data"],
     queryFn: async () => {
       const res = await fetch("/api/dashboard");
@@ -47,6 +47,7 @@ export default function CelulaPage() {
     },
     staleTime: 5 * 60 * 1000,
   });
+  const isDashboardLoading = isDashboardPending && !dashboardData;
 
   const rol = dashboardData?.session?.rol || "";
   const allUsers = (dashboardData?.usuarios || []) as Lider[];
@@ -114,10 +115,10 @@ export default function CelulaPage() {
     }
   };
 
-  if (!hydrated || isDashboardLoading || !lider) {
+  if (!hydrated || !lider) {
     return (
       <div className="flex items-center justify-center min-h-[40vh] text-gray-500 dark:text-neutral-400">
-        Cargando célula...
+        {isDashboardLoading || !hydrated ? "Cargando célula..." : "Redirigiendo..."}
       </div>
     );
   }

@@ -44,7 +44,13 @@ export function formatearDpi(dpi: string) {
   return `${inicio} ${medio} ${fin}`;
 }
 
-export function TelefonoInline({ telefono }: { telefono: string }) {
+export function TelefonoInline({
+  telefono,
+  pillClassName,
+}: {
+  telefono: string;
+  pillClassName?: string;
+}) {
   if (!telefono) {
     return <span className="text-[11px] text-gray-400">—</span>;
   }
@@ -54,7 +60,10 @@ export function TelefonoInline({ telefono }: { telefono: string }) {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2 py-1 font-mono text-xs font-semibold text-blue-800 hover:bg-blue-100 dark:border-blue-800/50 dark:bg-blue-900/20 dark:text-blue-300 dark:hover:bg-blue-900/40"
+          className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-xs font-semibold ${
+            pillClassName ??
+            "border-blue-200 bg-blue-50 text-blue-800 hover:bg-blue-100 dark:border-blue-800/50 dark:bg-blue-900/20 dark:text-blue-300 dark:hover:bg-blue-900/40"
+          }`}
         >
           <Phone className="h-3.5 w-3.5 shrink-0" />
           {formatearTelefono(telefono)}

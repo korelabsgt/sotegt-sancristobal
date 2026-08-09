@@ -4,12 +4,10 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/lib/toast";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  ArrowLeft,
   BarChart3,
   Building2,
   FileBarChart,
   Pencil,
-  Search,
   Trash2,
   X,
 } from "lucide-react";
@@ -48,6 +46,15 @@ import Lideres from "./Lideres";
 import MetaGeneral from "./MetaGeneral";
 import ModalBienvenida from "./ModalBienvenida";
 import Padron from "./Padron";
+import PanelListaPestana from "./PanelListaPestana";
+import {
+  TEMA_ADMIN,
+  TEMA_EMPLEADOS,
+  TEMA_LIDERES,
+  TEMA_MIEMBROS,
+  TEMA_SEDE,
+  type TemaLista,
+} from "./temaPestana";
 import type { Afiliado, Lider } from "./esquemas";
 import { esRolEmpleado, esUsuarioSede } from "./esquemas";
 import Form from "./forms/afiliados/Afiliados";
@@ -134,30 +141,35 @@ const tabEase = [0.25, 0.46, 0.45, 0.94] as const;
 const TAB_ORDER: Tab[] = [
   "Sede",
   "Lideres",
-  "Afiliados",
   "Empleados",
+  "Afiliados",
   "Padron",
-  "Administrativos",
   "Mensajes",
+  "Administrativos",
 ];
 
 const tabBtnClass = (active: boolean, tab: Tab) => {
   const theme = TAB_THEMES[tab];
-  return `relative flex w-full md:w-auto md:shrink-0 flex-col md:flex-row items-center justify-center gap-0.5 md:gap-1.5 px-1 md:px-3 py-1.5 md:py-2 text-[10px] leading-tight md:text-sm font-semibold bg-transparent transition-colors duration-300 ${
+  return `relative flex w-full md:w-auto md:shrink-0 flex-row items-center justify-center px-1.5 sm:px-2 py-2.5 md:py-3 text-sm md:text-base font-semibold transition-colors duration-300 ${
     active
-      ? `z-10 ${theme.activeText}`
-      : `z-0 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200`
+      ? theme.activeText
+      : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
   }`;
 };
 
-const tabIconClass = (active: boolean, tab: Tab) => {
+const tabPillClass = (active: boolean, tab: Tab) => {
   const theme = TAB_THEMES[tab];
-  return `flex items-center justify-center p-0.5 md:p-1 rounded-md transition-colors duration-300 shrink-0 ${
+  return `relative inline-flex w-full max-w-full items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 md:px-3.5 py-2 md:py-2.5 rounded-lg transition-colors duration-300 ${
     active
-      ? `${theme.activeIconBg} ${theme.activeIconText}`
-      : "text-gray-400 dark:text-gray-500"
+      ? `${theme.activeIconBg} ${theme.activeText}`
+      : "bg-gray-100 dark:bg-neutral-800 text-gray-500 dark:text-gray-400"
   }`;
 };
+
+const tabIconClass = () => "shrink-0 flex items-center justify-center";
+
+const tabBadgeClass = () =>
+  "inline-flex items-center justify-center min-w-[1.25rem] md:min-w-[1.5rem] font-bold leading-none shrink-0 tabular-nums";
 
 export default function Ver() {
   const queryClient = useQueryClient();
@@ -192,7 +204,7 @@ export default function Ver() {
   const [searchTerm, setSearchTerm] = useState("");
   const [liderSimulado, setLiderSimulado] = useState<Lider | null>(null);
 
-  const { data: dashboardData, isLoading: isDashboardLoading } = useQuery({
+  const { data: dashboardData, isPending: isDashboardPending } = useQuery({
     queryKey: ["dashboard-data"],
     queryFn: async () => {
       const res = await fetch("/api/dashboard");
@@ -205,6 +217,7 @@ export default function Ver() {
     },
     staleTime: 5 * 60 * 1000,
   });
+  const isDashboardLoading = isDashboardPending && !dashboardData;
 
   const session = dashboardData?.session;
   const rol = session?.rol || "";
@@ -216,11 +229,7 @@ export default function Ver() {
     rolUpper === "ADMINISTRADOR" ||
     rolUpper === "SUPER";
   const puedeCrearRolSuper = rolUpper === "SUPER";
-  const puedeSimular =
-    rolUpper === "ADMINISTRADOR" ||
-    rolUpper === "ADMIN" ||
-    rolUpper === "SUPER" ||
-    rolUpper === "DOCUMENTADOR";
+  const puedeSimular = rolUpper === "SUPER";
   const esAdminOSuper =
     rolUpper === "ADMINISTRADOR" ||
     rolUpper === "ADMIN" ||
@@ -236,8 +245,14 @@ export default function Ver() {
         rol: session.rol,
       }));
   const vistaConPestanas = esAdminOSuper || esSedeSesion;
+  const puedeCrearLiderOEmpleado = esAdminOSuper || esSedeSesion;
   const soloLecturaSede = esSedeSesion;
   const esLider = rolUpper === "LIDER";
+
+  const esRolLiderOEmpleado = (rolUsuario?: string | null) => {
+    const n = (rolUsuario || "").toUpperCase().trim();
+    return n === "LIDER" || n === "LÍDER" || n === "EMPLEADO" || n === "TRABAJADOR";
+  };
 
   const handleSimular = () => {
     setLiderSimulado((prev) => (prev ? null : LIDER_SIMULADO));
@@ -265,7 +280,7 @@ export default function Ver() {
     }
   }, [haySedeHabilitada, hayEmpleadosHabilitada, activeTab]);
 
-  const { data: afiliados = [], isPending: isLoadingAfiliados } = useQuery({
+  const { data: afiliadosData, isPending: isAfiliadosPending } = useQuery({
     queryKey: ["afiliados-gl"],
     queryFn: () => obtenerAfiliadosAction(),
     enabled:
@@ -280,6 +295,8 @@ export default function Ver() {
     gcTime: 30 * 60_000,
     refetchOnMount: false,
   });
+  const afiliados = afiliadosData ?? [];
+  const isLoadingAfiliados = isAfiliadosPending && afiliadosData === undefined;
 
   const allUsers = (dashboardData?.usuarios || []) as Lider[];
   const allLideres = allUsers.filter(
@@ -353,7 +370,15 @@ export default function Ver() {
   const totalMiembrosGeneral =
     (haySedeHabilitada ? totalAfiliadosSede : 0) +
     totalAfiliadosLideres +
-    (hayEmpleadosHabilitada ? totalAfiliadosEmpleados : 0);
+    (hayEmpleadosHabilitada ? totalAfiliadosEmpleados : 0) +
+    (liderSimulado ? AFILIADOS_SIMULADOS.length : 0);
+
+  const afiliadosVista = liderSimulado
+    ? [...AFILIADOS_SIMULADOS, ...afiliados]
+    : afiliados;
+  const lideresVistaMiembros = liderSimulado
+    ? [liderSimulado, ...allUsers]
+    : allUsers;
 
   const cargandoLideres = isDashboardLoading;
   const cargandoMiembros = isLoadingAfiliados || cargandoLideres;
@@ -373,6 +398,7 @@ export default function Ver() {
     rol: "LIDER" | "EMPLEADO" | "ADMIN" | "SUPER",
   ) => {
     if (rol === "SUPER" && !puedeCrearRolSuper) return;
+    if (esSedeSesion && rol !== "LIDER" && rol !== "EMPLEADO") return;
     setLiderAEditar(null);
     setModoCrearSede(false);
     setRolCreacionInicial(rol);
@@ -389,6 +415,7 @@ export default function Ver() {
   };
 
   const handleOpenEditLiderModal = (lider: Lider) => {
+    if (esSedeSesion && !esRolLiderOEmpleado(lider.rol)) return;
     setLiderAEditar(lider);
     setModoCrearSede(false);
     setRolCreacionInicial(null);
@@ -443,10 +470,7 @@ export default function Ver() {
   const cambiarTab = (tab: Tab) => {
     if (
       soloLecturaSede &&
-      (tab === "Mensajes" ||
-        tab === "Administrativos" ||
-        tab === "Padron" ||
-        tab === "Empleados")
+      (tab === "Mensajes" || tab === "Administrativos" || tab === "Padron")
     ) {
       return;
     }
@@ -460,26 +484,44 @@ export default function Ver() {
     setLiderParaCelula(null);
   };
 
-  const renderBarraPestana = (acciones?: ReactNode) => (
-    <div className="mb-4 flex flex-col sm:flex-row sm:items-center gap-2 w-full min-w-0">
-      <div className="relative flex-1 min-w-0 w-full">
-        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <Search className="h-4 w-4 md:h-5 md:w-5 text-gray-400" />
-        </div>
-        <input
-          type="text"
-          placeholder="Buscar por nombre"
-          className="pl-9 md:pl-10 pr-3 py-2 h-10 text-sm border border-gray-300 dark:border-neutral-700 rounded-md w-full bg-white dark:bg-neutral-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </div>
-      {acciones ? (
-        <div className="flex flex-row items-center gap-2 shrink-0 w-full sm:w-auto">
-          {acciones}
-        </div>
-      ) : null}
-    </div>
+  const getTemaTab = (tab: Tab): TemaLista => {
+    switch (tab) {
+      case "Sede":
+        return TEMA_SEDE;
+      case "Lideres":
+        return TEMA_LIDERES;
+      case "Empleados":
+        return TEMA_EMPLEADOS;
+      case "Afiliados":
+        return TEMA_MIEMBROS;
+      case "Administrativos":
+        return TEMA_ADMIN;
+      default:
+        return TEMA_LIDERES;
+    }
+  };
+
+  const placeholdersTab: Partial<Record<Tab, string>> = {
+    Lideres: "Buscar por nombre...",
+    Empleados: "Buscar por nombre...",
+    Afiliados: "Buscar por nombre o DPI...",
+    Administrativos: "Buscar por nombre...",
+  };
+
+  const renderPanelTab = (
+    tab: Tab,
+    children: ReactNode,
+    acciones?: ReactNode,
+  ) => (
+    <PanelListaPestana
+      tema={getTemaTab(tab)}
+      placeholder={placeholdersTab[tab] || "Buscar por nombre..."}
+      value={searchTerm}
+      onChange={setSearchTerm}
+      acciones={acciones}
+    >
+      {children}
+    </PanelListaPestana>
   );
 
   const handleCloseFormModal = () => {
@@ -509,7 +551,7 @@ export default function Ver() {
           nombreLider={miPerfilGlobal?.nombres || "Usuario"}
         />
       )}
-      <div className="px-2 md:px-6 max-w-full overflow-x-hidden min-w-0 w-full">
+      <div className="px-2 md:px-6 max-w-full overflow-x-hidden min-w-0 w-full pb-20 md:pb-28">
         <ConfiguracionSistema showMetas={false} allowEditing={false} />
         <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 min-w-0 w-full">
           <div
@@ -593,8 +635,8 @@ export default function Ver() {
               mostrarSede={haySedeHabilitada}
               mostrarEmpleados={hayEmpleadosHabilitada}
             />
-            <div className="mb-6 w-full min-w-0 bg-white dark:bg-neutral-950">
-              <div className="relative w-full min-w-0 gap-0.5 md:gap-1 grid grid-cols-4 md:flex md:flex-nowrap md:items-stretch border-b border-gray-200 dark:border-neutral-700">
+            <div className="mb-6 w-full min-w-0 border-b border-gray-200 dark:border-neutral-800">
+              <div className="grid w-full min-w-0 grid-cols-2 gap-1 sm:gap-0 md:flex md:flex-nowrap md:overflow-x-auto">
                 {(
                   [
                     {
@@ -612,18 +654,18 @@ export default function Ver() {
                       show: true,
                     },
                     {
+                      id: "Empleados" as Tab,
+                      label: "Empleados",
+                      count: totalEmpleadosRegistrados,
+                      icon: PiBriefcaseDuotone,
+                      show: puedeCrearLiderOEmpleado && hayEmpleadosHabilitada,
+                    },
+                    {
                       id: "Afiliados" as Tab,
                       label: "Miembros",
                       count: totalMiembrosGeneral,
                       icon: PiUsersThreeDuotone,
                       show: true,
-                    },
-                    {
-                      id: "Empleados" as Tab,
-                      label: "Empleados",
-                      count: totalEmpleadosRegistrados,
-                      icon: PiBriefcaseDuotone,
-                      show: esAdminOSuper && hayEmpleadosHabilitada,
                     },
                     {
                       id: "Padron" as Tab,
@@ -633,17 +675,17 @@ export default function Ver() {
                       show: esAdminOSuper && padronHabilitado,
                     },
                     {
-                      id: "Administrativos" as Tab,
-                      label: "Administrativos",
-                      count: totalAdministrativosRegistrados,
-                      icon: PiShieldCheckDuotone,
-                      show: esAdminOSuper,
-                    },
-                    {
                       id: "Mensajes" as Tab,
                       label: "Mensajes",
                       count: null as number | null,
                       icon: PiChatCircleDotsDuotone,
+                      show: esAdminOSuper,
+                    },
+                    {
+                      id: "Administrativos" as Tab,
+                      label: "Administrativos",
+                      count: totalAdministrativosRegistrados,
+                      icon: PiShieldCheckDuotone,
                       show: esAdminOSuper,
                     },
                   ] as const
@@ -660,41 +702,32 @@ export default function Ver() {
                         onClick={() => cambiarTab(tab.id)}
                         className={tabBtnClass(activo, tab.id)}
                         whileTap={{ scale: 0.98 }}
-                        transition={{ duration: 0.25, ease: tabEase }}
+                        transition={{ duration: 0.2, ease: tabEase }}
                       >
-                        <span
-                          className={`relative z-10 ${tabIconClass(activo, tab.id)}`}
-                        >
-                          <Icon className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0" />
-                        </span>
-                        <span className="relative z-10 inline-flex items-center justify-center gap-1 md:gap-1.5 max-w-full">
-                          <span className="text-center break-words hyphens-auto">
+                        <span className={tabPillClass(activo, tab.id)}>
+                          <span className={tabIconClass()}>
+                            <Icon className="h-5 w-5 shrink-0 md:h-6 md:w-6" />
+                          </span>
+                          <span className="whitespace-normal text-center leading-tight sm:whitespace-nowrap">
                             {tab.label}
                           </span>
                           {tab.count !== null && (
-                            <span
-                              className={`inline-flex items-center justify-center min-w-[1.15rem] h-4 md:min-w-[1.35rem] md:h-5 px-1 rounded-full text-[9px] md:text-[11px] font-black leading-none tabular-nums ${
-                                activo
-                                  ? `${theme.activeIconBg} ${theme.activeIconText}`
-                                  : "bg-gray-100 text-gray-500 dark:bg-neutral-800 dark:text-gray-400"
-                              }`}
-                            >
+                            <span className={tabBadgeClass()}>
                               {tab.count > 999 ? "999+" : tab.count}
                             </span>
                           )}
+                          {activo && (
+                            <motion.span
+                              layoutId="pestana-subrayado"
+                              className={`absolute -bottom-[9px] left-0 right-0 z-20 h-[2px] rounded-full md:-bottom-[11px] md:h-[3px] ${theme.lineBg}`}
+                              transition={{
+                                type: "spring",
+                                stiffness: 380,
+                                damping: 32,
+                              }}
+                            />
+                          )}
                         </span>
-                        {activo && (
-                          <motion.span
-                            layoutId="pestana-underline"
-                            className={`pointer-events-none absolute left-1 right-1 md:left-2 md:right-2 bottom-0 h-0.5 rounded-full z-20 ${theme.lineBg}`}
-                            transition={{
-                              type: "spring",
-                              stiffness: 380,
-                              damping: 32,
-                              mass: 0.7,
-                            }}
-                          />
-                        )}
                       </motion.button>
                     );
                   })}
@@ -711,19 +744,10 @@ export default function Ver() {
                   exit={{ opacity: 0, x: tabSlideDir * -28 }}
                   transition={{ duration: 0.45, ease: tabEase }}
                 >
-                  <div className="mb-3">
-                    <button
-                      type="button"
-                      onClick={handleVolverDeCelula}
-                      className="inline-flex items-center gap-1.5 text-sm font-bold text-red-600 hover:text-red-700 underline underline-offset-[6px] decoration-red-600/90 hover:decoration-red-700 uppercase tracking-wide bg-transparent border-0 cursor-pointer transition-colors"
-                    >
-                      <ArrowLeft className="w-4 h-4 shrink-0" />
-                      Volver
-                    </button>
-                  </div>
                   <Celula
                     mode="embedded"
                     lider={liderParaCelula}
+                    onClose={handleVolverDeCelula}
                     onEditar={handleOpenEditModal}
                     onAnadirAfiliado={handleOpenAnadirAfiliadoModal}
                     onDataChange={fetchData}
@@ -818,23 +842,9 @@ export default function Ver() {
                       </div>
                     ))}
 
-                  {activeTab === "Lideres" && (
-                    <>
-                      {renderBarraPestana(
-                        puedeVerBotonNuevo ? (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() =>
-                              handleOpenCreateUsuarioModal("LIDER")
-                            }
-                            className="gap-1.5 h-10 px-3 text-sm font-semibold border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/40 hover:bg-orange-100 dark:hover:bg-orange-950/60 shadow-sm w-full sm:w-auto"
-                          >
-                            <PiMedalDuotone className="w-4 h-4 shrink-0" />
-                            Nuevo Enlace
-                          </Button>
-                        ) : undefined,
-                      )}
+                  {activeTab === "Lideres" &&
+                    renderPanelTab(
+                      "Lideres",
                       <Lideres
                         lideres={lideresVisibles}
                         onVerCelula={handleOpenCelula}
@@ -844,99 +854,70 @@ export default function Ver() {
                         searchTerm={searchTerm}
                         idUsuarioSesion={userId}
                         isLoading={cargandoLideres}
-                      />
-                    </>
-                  )}
+                        tema={getTemaTab("Lideres")}
+                      />,
+                      puedeCrearLiderOEmpleado ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() =>
+                            handleOpenCreateUsuarioModal("LIDER")
+                          }
+                          className="gap-1.5 h-10 px-3 text-sm font-semibold border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/40 hover:bg-orange-100 dark:hover:bg-orange-950/60 shadow-sm w-full sm:w-auto"
+                        >
+                          <PiMedalDuotone className="w-4 h-4 shrink-0" />
+                          Nuevo Enlace
+                        </Button>
+                      ) : undefined,
+                    )}
                   {activeTab === "Afiliados" && (
-                    <>
-                      {renderBarraPestana()}
-                      <AfiliadosGeneral
-                        afiliados={afiliados}
-                        lideres={allUsers}
-                        onEditar={handleOpenEditModal}
-                        onDataChange={refreshAfterDeletion}
-                        searchTerm={searchTerm}
-                        isLoading={cargandoMiembros}
-                      />
-                    </>
+                    <AfiliadosGeneral
+                      afiliados={afiliadosVista}
+                      lideres={lideresVistaMiembros}
+                      onEditar={handleOpenEditModal}
+                      onDataChange={refreshAfterDeletion}
+                      searchTerm={searchTerm}
+                      onSearchChange={setSearchTerm}
+                      isLoading={cargandoMiembros}
+                      tema={getTemaTab("Afiliados")}
+                    />
                   )}
                   {activeTab === "Empleados" &&
-                    esAdminOSuper &&
-                    hayEmpleadosHabilitada && (
-                      <>
-                        {renderBarraPestana(
-                          puedeVerBotonNuevo ? (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() =>
-                                handleOpenCreateUsuarioModal("EMPLEADO")
-                              }
-                              className="gap-1.5 h-10 px-3 text-sm font-semibold border-violet-500 text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/40 hover:bg-violet-100 dark:hover:bg-violet-950/60 shadow-sm w-full sm:w-auto"
-                            >
-                              <PiBriefcaseDuotone className="w-4 h-4 shrink-0" />
-                              Nuevo Empleado
-                            </Button>
-                          ) : undefined,
-                        )}
-                        <Lideres
-                          lideres={empleados}
-                          onVerCelula={handleOpenCelula}
-                          onEditar={handleOpenEditLiderModal}
-                          rolUsuarioSesion={rolSesionCelula}
-                          onDataChange={refreshAfterDeletion}
-                          searchTerm={searchTerm}
-                          idUsuarioSesion={userId}
-                          isLoading={cargandoLideres}
-                        />
-                      </>
+                    puedeCrearLiderOEmpleado &&
+                    hayEmpleadosHabilitada &&
+                    renderPanelTab(
+                      "Empleados",
+                      <Lideres
+                        lideres={empleados}
+                        onVerCelula={handleOpenCelula}
+                        onEditar={handleOpenEditLiderModal}
+                        rolUsuarioSesion={rolSesionCelula}
+                        onDataChange={refreshAfterDeletion}
+                        searchTerm={searchTerm}
+                        idUsuarioSesion={userId}
+                        isLoading={cargandoLideres}
+                        tema={getTemaTab("Empleados")}
+                      />,
+                      puedeCrearLiderOEmpleado ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() =>
+                            handleOpenCreateUsuarioModal("EMPLEADO")
+                          }
+                          className="gap-1.5 h-10 px-3 text-sm font-semibold border-violet-500 text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/40 hover:bg-violet-100 dark:hover:bg-violet-950/60 shadow-sm w-full sm:w-auto"
+                        >
+                          <PiBriefcaseDuotone className="w-4 h-4 shrink-0" />
+                          Nuevo Empleado
+                        </Button>
+                      ) : undefined,
                     )}
                   {activeTab === "Padron" &&
                     esAdminOSuper &&
                     padronHabilitado && <Padron />}
-                  {activeTab === "Administrativos" && (
-                    <>
-                      {renderBarraPestana(
-                        puedeVerBotonNuevo ? (
-                          <>
-                            {puedeVerReportesLideres && (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                className="gap-1.5 h-10 px-3 text-sm font-semibold text-blue-900 dark:text-blue-300 border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-950/60"
-                                onClick={() => setIsReportesLideresOpen(true)}
-                              >
-                                <FileBarChart className="w-4 h-4 shrink-0" />
-                                Reportes
-                              </Button>
-                            )}
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() =>
-                                handleOpenCreateUsuarioModal("ADMIN")
-                              }
-                              className="gap-1.5 h-10 px-3 text-sm font-semibold border-indigo-500 text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-950/60 shadow-sm"
-                            >
-                              <PiShieldCheckDuotone className="w-4 h-4 shrink-0" />
-                              Nuevo Admin
-                            </Button>
-                            {puedeCrearRolSuper && (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() =>
-                                  handleOpenCreateUsuarioModal("SUPER")
-                                }
-                                className="gap-1.5 h-10 px-3 text-sm font-semibold border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-950/60 shadow-sm"
-                              >
-                                <PiCodeDuotone className="w-4 h-4 shrink-0" />
-                                Nuevo Super
-                              </Button>
-                            )}
-                          </>
-                        ) : undefined,
-                      )}
+                  {activeTab === "Administrativos" &&
+                    renderPanelTab(
+                      "Administrativos",
                       <Lideres
                         lideres={administrativos}
                         onVerCelula={handleOpenCelula}
@@ -946,9 +927,48 @@ export default function Ver() {
                         searchTerm={searchTerm}
                         idUsuarioSesion={userId}
                         isLoading={cargandoLideres}
-                      />
-                    </>
-                  )}
+                        tema={getTemaTab("Administrativos")}
+                      />,
+                      puedeVerBotonNuevo ? (
+                        <>
+                          {puedeVerReportesLideres && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="gap-1.5 h-10 px-3 text-sm font-semibold text-blue-900 dark:text-blue-300 border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-950/60"
+                              onClick={() => setIsReportesLideresOpen(true)}
+                            >
+                              <FileBarChart className="w-4 h-4 shrink-0" />
+                              Reportes
+                            </Button>
+                          )}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() =>
+                              handleOpenCreateUsuarioModal("ADMIN")
+                            }
+                            className="gap-1.5 h-10 px-3 text-sm font-semibold border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-950/60 shadow-sm"
+                          >
+                            <PiShieldCheckDuotone className="w-4 h-4 shrink-0" />
+                            Nuevo Admin
+                          </Button>
+                          {puedeCrearRolSuper && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() =>
+                                handleOpenCreateUsuarioModal("SUPER")
+                              }
+                              className="gap-1.5 h-10 px-3 text-sm font-semibold border-neutral-900 text-neutral-900 dark:border-neutral-100 dark:text-neutral-100 bg-neutral-50 dark:bg-neutral-900/60 hover:bg-neutral-100 dark:hover:bg-neutral-800 shadow-sm"
+                            >
+                              <PiCodeDuotone className="w-4 h-4 shrink-0" />
+                              Nuevo Super
+                            </Button>
+                          )}
+                        </>
+                      ) : undefined,
+                    )}
                   {activeTab === "Mensajes" && esAdminOSuper && (
                     <Difusion
                       usuarios={allUsers}
@@ -1055,8 +1075,8 @@ export default function Ver() {
                 leaveFrom="opacity-100 translate-y-0 sm:scale-100"
                 leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
               >
-                <DialogPanel className="relative transform overflow-hidden rounded-2xl bg-white dark:bg-neutral-900 text-gray-900 dark:text-gray-100 text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-2xl border border-gray-200 dark:border-neutral-800">
-                  <div className="p-4 md:p-6">
+                <DialogPanel className="relative transform overflow-hidden rounded-3xl border border-gray-200/80 bg-white text-left text-gray-900 shadow-2xl shadow-black/10 transition-all dark:border-neutral-800 dark:bg-neutral-950 dark:text-gray-100 sm:my-8 sm:w-full sm:max-w-lg">
+                  <div className="p-5 md:p-6">
                     <SignupForm
                       key={signupFormKey}
                       initialData={liderAEditar}

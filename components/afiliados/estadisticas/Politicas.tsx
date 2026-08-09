@@ -1,18 +1,10 @@
 "use client";
 
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  LabelList,
   Cell,
   PieChart,
   Pie,
-  Rectangle,
+  ResponsiveContainer,
 } from "recharts";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -22,11 +14,11 @@ import { obtenerPoliticasConSubsAction } from "../forms/afiliados/catalogos";
 import { INTERESES_CATALOGO_DEMO } from "../datosSimulados";
 import {
   CHART_PALETTE,
-  ChartTooltip,
   ChartHeader,
   ChartFooter,
 } from "./chartTheme";
 import { useChartTheme } from "./useChartTheme";
+import BarrasHorizontales from "./BarrasHorizontales";
 
 interface Props {
   afiliados: Afiliado[];
@@ -38,100 +30,23 @@ type CatalogoPolitica = { politica: string; subs: string[] };
 
 function ResumenTotales({
   datos,
-  maxTotal,
 }: {
   datos: { name: string; value: number; color: string }[];
-  maxTotal: number;
 }) {
-  const theme = useChartTheme();
   const total = datos.reduce((s, d) => s + d.value, 0);
 
   return (
-    <div className="bg-gray-50 dark:bg-neutral-800/40 border border-gray-200 dark:border-neutral-700/80 rounded-xl p-4 md:p-5 shadow-sm w-full">
-      <h5 className="text-sm font-black text-gray-800 dark:text-neutral-100 uppercase mb-3 tracking-tight">
+    <div className="bg-white dark:bg-neutral-900/40 border border-gray-200 dark:border-neutral-700/80 rounded-xl p-4 md:p-5 shadow-sm w-full flex flex-col gap-3">
+      <h5 className="text-sm font-black text-gray-800 dark:text-neutral-100 uppercase tracking-tight">
         Totales por interés
       </h5>
-      <div className="w-full" style={{ height: Math.max(datos.length * 58 + 36, 140) }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart
-            layout="vertical"
-            data={datos}
-            margin={{ top: 12, right: 24, left: 0, bottom: 12 }}
-          >
-            <CartesianGrid
-              strokeDasharray="3 3"
-              horizontal={false}
-              stroke={theme.grid}
-              opacity={0.5}
-            />
-            <XAxis type="number" hide domain={[0, maxTotal || "auto"]} />
-            <YAxis type="category" dataKey="name" width={10} tick={false} axisLine={false} tickLine={false} />
-            <Tooltip content={<ChartTooltip />} cursor={{ fill: theme.cursor, radius: 8 }} />
-            <Bar
-              dataKey="value"
-              barSize={22}
-              shape={(rawProps: unknown) => {
-                const { x = 0, y = 0, width = 0, height = 0, index = 0 } = rawProps as {
-                  x?: number;
-                  y?: number;
-                  width?: number;
-                  height?: number;
-                  index?: number;
-                };
-                const entry = datos[index];
-                return (
-                  <Rectangle
-                    x={x}
-                    y={y - 12}
-                    width={width}
-                    height={height}
-                    fill={entry?.color ?? CHART_PALETTE[0]}
-                    radius={[0, 10, 10, 0]}
-                  />
-                );
-              }}
-            >
-              {datos.map((entry, i) => (
-                <Cell key={i} fill={entry.color} />
-              ))}
-              <LabelList
-                dataKey="name"
-                content={(props: { x?: string | number; y?: string | number; index?: number }) => {
-                  const x = Number(props.x ?? 0);
-                  const y = Number(props.y ?? 0);
-                  const index = props.index ?? 0;
-                  const item = datos[index];
-                  if (!item) return null;
-
-                  const percent = total > 0 ? (item.value / total) * 100 : 0;
-
-                  return (
-                    <text
-                      x={x}
-                      y={y + 24}
-                      fill={theme.tick}
-                      fontSize={9}
-                      className="uppercase"
-                      textAnchor="start"
-                    >
-                      <tspan fontWeight="600" fill={theme.tick}>
-                        {item.name}
-                      </tspan>
-                      <tspan dx={6} fontSize={13} fontWeight="900" fill={item.color}>
-                        {item.value}
-                      </tspan>
-                      <tspan fontWeight="500" fontSize={10} fill={theme.labelMuted}>
-                        {" "}
-                        · {percent.toFixed(0)}%
-                      </tspan>
-                    </text>
-                  );
-                }}
-              />
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+      <BarrasHorizontales
+        items={datos}
+        total={total}
+        labelColumna="Interés"
+        accentColor="#8b5cf6"
+        maxHeightClass="max-h-[min(40vh,420px)]"
+      />
     </div>
   );
 }
@@ -162,7 +77,7 @@ function MiniInteres({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: index * 0.06, ease: "easeOut" }}
-      className="bg-gray-50 dark:bg-neutral-800/40 border border-gray-200 dark:border-neutral-700/80 rounded-xl p-4 md:p-5 shadow-sm flex flex-col w-full gap-4"
+      className="bg-white dark:bg-neutral-900/40 border border-gray-200 dark:border-neutral-700/80 rounded-xl p-4 md:p-5 shadow-sm flex flex-col w-full gap-4"
     >
       <h5
         className="text-sm font-black uppercase tracking-tight"
@@ -187,8 +102,14 @@ function MiniInteres({
           <motion.div
             className="absolute inset-y-0 left-0 rounded-full"
             initial={{ width: 0 }}
-            animate={{ width: `${Math.max(porcentajeTotal, total > 0 ? 4 : 0)}%` }}
-            transition={{ duration: 0.7, delay: index * 0.06 + 0.15, ease: "easeOut" }}
+            animate={{
+              width: `${Math.max(porcentajeTotal, total > 0 ? 4 : 0)}%`,
+            }}
+            transition={{
+              duration: 0.7,
+              delay: index * 0.06 + 0.15,
+              ease: "easeOut",
+            }}
             style={{
               background: `linear-gradient(90deg, ${colorAccent}, ${colorAccent}cc)`,
             }}
@@ -200,7 +121,11 @@ function MiniInteres({
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, delay: index * 0.06 + 0.2, ease: "easeOut" }}
+          transition={{
+            duration: 0.45,
+            delay: index * 0.06 + 0.2,
+            ease: "easeOut",
+          }}
           className="flex flex-col xl:flex-row gap-4 xl:gap-6 w-full items-stretch"
         >
           <div className="relative w-full max-w-[220px] h-[220px] shrink-0 mx-auto xl:mx-0">
@@ -224,7 +149,9 @@ function MiniInteres({
                     <Cell
                       key={i}
                       fill={entry.color}
-                      opacity={activo === null || activo === entry.name ? 1 : 0.3}
+                      opacity={
+                        activo === null || activo === entry.name ? 1 : 0.3
+                      }
                       style={{ transition: "opacity 0.3s ease" }}
                     />
                   ))}
@@ -233,11 +160,11 @@ function MiniInteres({
             </ResponsiveContainer>
 
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none px-4">
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400 dark:text-neutral-500">
+                Total
+              </span>
               <span className="text-3xl md:text-4xl font-black text-gray-900 dark:text-white tabular-nums leading-none">
                 {total}
-              </span>
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400 dark:text-neutral-500 mt-1">
-                Total
               </span>
               <AnimatePresence>
                 {itemActivo && (
@@ -256,8 +183,10 @@ function MiniInteres({
                       className="text-sm font-black tabular-nums"
                       style={{ color: itemActivo.color }}
                     >
-                      {total > 0 ? ((itemActivo.value / total) * 100).toFixed(0) : 0}% ·{" "}
-                      {itemActivo.value}
+                      {total > 0
+                        ? ((itemActivo.value / total) * 100).toFixed(0)
+                        : 0}
+                      % · {itemActivo.value}
                     </span>
                   </motion.div>
                 )}
@@ -265,45 +194,67 @@ function MiniInteres({
             </div>
           </div>
 
-          <div className="flex-1 rounded-2xl bg-violet-50/80 dark:bg-neutral-800/50 border border-violet-100 dark:border-neutral-700/60 p-4 flex flex-col gap-1">
-            <p className="text-[10px] font-black uppercase tracking-widest text-violet-600 dark:text-violet-400 text-center mb-2">
-              Desglose
-            </p>
-            {datos.map((d, i) => {
-              const pct = total > 0 ? ((d.value / total) * 100).toFixed(0) : "0";
-              const esActivo = activo === d.name;
-              return (
-                <motion.div
-                  key={d.name}
-                  initial={{ opacity: 0, x: 8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.3, delay: index * 0.06 + 0.28 + i * 0.05 }}
-                  onMouseEnter={() => setActivo(d.name)}
-                  onMouseLeave={() => setActivo(null)}
-                  className={`flex items-center gap-3 rounded-xl px-2 py-2 transition-all duration-300 cursor-default ${
-                    esActivo
-                      ? "bg-white dark:bg-neutral-900 shadow-sm scale-[1.01]"
-                      : "bg-white/40 dark:bg-neutral-900/30"
-                  }`}
-                >
-                  <span
-                    className="w-9 h-9 rounded-full shrink-0 flex items-center justify-center text-white text-xs font-black tabular-nums shadow-sm"
-                    style={{ backgroundColor: d.color }}
-                  >
-                    {d.value}
-                  </span>
-                  <span className="flex-1 text-xs font-semibold text-gray-700 dark:text-neutral-300 leading-tight">
-                    {d.name}
-                  </span>
-                  <span
-                    className="text-sm font-black tabular-nums shrink-0"
-                    style={{ color: d.color }}
-                  >
-                    {pct}%
-                  </span>
-                </motion.div>
-              );
-            })}
+          <div className="flex-1 overflow-hidden rounded-lg border border-gray-100 bg-gray-50/50 dark:border-neutral-800 dark:bg-neutral-900/40">
+            <table className="w-full table-fixed border-collapse text-left">
+              <colgroup>
+                <col />
+                <col className="w-[3.5rem]" />
+                <col className="w-[3rem]" />
+              </colgroup>
+              <thead>
+                <tr className="border-b border-gray-200 dark:border-neutral-700">
+                  <th className="px-3 pb-2 pt-2 text-[9px] font-bold uppercase tracking-wide text-gray-500 dark:text-neutral-400 md:text-[10px]">
+                    Categoría
+                  </th>
+                  <th className="px-3 pb-2 pt-2 text-right text-[9px] font-bold uppercase tracking-wide text-gray-500 dark:text-neutral-400 md:text-[10px]">
+                    Cant.
+                  </th>
+                  <th className="px-3 pb-2 pt-2 text-right text-[9px] font-bold uppercase tracking-wide text-gray-500 dark:text-neutral-400 md:text-[10px]">
+                    %
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {datos.map((d) => {
+                  const pct =
+                    total > 0 ? ((d.value / total) * 100).toFixed(0) : "0";
+                  const esActivo = activo === d.name;
+                  return (
+                    <tr
+                      key={d.name}
+                      onMouseEnter={() => setActivo(d.name)}
+                      onMouseLeave={() => setActivo(null)}
+                      className={`cursor-default border-b border-gray-100 last:border-0 dark:border-neutral-800 ${
+                        esActivo
+                          ? "bg-white dark:bg-neutral-800/80"
+                          : "hover:bg-gray-50 dark:hover:bg-neutral-800/40"
+                      }`}
+                    >
+                      <td className="px-3 py-2">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span
+                            className="h-2.5 w-2.5 shrink-0 rounded-full"
+                            style={{ backgroundColor: d.color }}
+                          />
+                          <span className="truncate text-[9px] font-bold uppercase leading-snug text-gray-700 dark:text-neutral-300 md:text-[10px]">
+                            {d.name}
+                          </span>
+                        </div>
+                      </td>
+                      <td
+                        className="px-3 py-2 text-right text-xs font-black tabular-nums"
+                        style={{ color: d.color }}
+                      >
+                        {d.value}
+                      </td>
+                      <td className="px-3 py-2 text-right text-[10px] font-semibold tabular-nums text-gray-500 dark:text-neutral-400">
+                        {pct}%
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </motion.div>
       ) : (
@@ -430,7 +381,7 @@ export default function Politicas({ afiliados, simulacionActiva = false }: Props
       ) : (
         <div className="flex flex-col gap-5 w-full">
           {resumenTotales.length > 1 && (
-            <ResumenTotales datos={resumenTotales} maxTotal={maxTotal} />
+            <ResumenTotales datos={resumenTotales} />
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 w-full">

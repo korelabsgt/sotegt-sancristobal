@@ -68,7 +68,8 @@ export default function Religiones({ afiliados }: Props) {
                 strokeWidth={4}
                 onMouseEnter={(_, i) => {
                   const item = datosGrafica[i];
-                  if (item?.name !== "Sin registros") setActivo(item?.name ?? null);
+                  if (item?.name !== "Sin registros")
+                    setActivo(item?.name ?? null);
                 }}
                 onMouseLeave={() => setActivo(null)}
               >
@@ -77,7 +78,9 @@ export default function Religiones({ afiliados }: Props) {
                     key={`cell-${index}`}
                     fill={entry.color}
                     opacity={
-                      entry.name === "Sin registros" || activo === null || activo === entry.name
+                      entry.name === "Sin registros" ||
+                      activo === null ||
+                      activo === entry.name
                         ? 1
                         : 0.3
                     }
@@ -90,11 +93,11 @@ export default function Religiones({ afiliados }: Props) {
 
           {tieneDatos && (
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none px-4">
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400 dark:text-neutral-500">
+                Total
+              </span>
               <span className="text-3xl md:text-4xl font-black text-gray-900 dark:text-white tabular-nums leading-none">
                 {total}
-              </span>
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400 dark:text-neutral-500 mt-1">
-                Total
               </span>
               <AnimatePresence>
                 {itemActivo && (
@@ -113,8 +116,10 @@ export default function Religiones({ afiliados }: Props) {
                       className="text-sm font-black tabular-nums"
                       style={{ color: itemActivo.color }}
                     >
-                      {total > 0 ? ((itemActivo.value / total) * 100).toFixed(0) : 0}% ·{" "}
-                      {itemActivo.value}
+                      {total > 0
+                        ? ((itemActivo.value / total) * 100).toFixed(0)
+                        : 0}
+                      % · {itemActivo.value}
                     </span>
                   </motion.div>
                 )}
@@ -124,45 +129,78 @@ export default function Religiones({ afiliados }: Props) {
         </div>
 
         {datosDonut.length > 0 ? (
-          <div className="flex-1 rounded-2xl bg-violet-50/80 dark:bg-neutral-800/50 border border-violet-100 dark:border-neutral-700/60 p-4 flex flex-col gap-1">
-            <p className="text-[10px] font-black uppercase tracking-widest text-violet-600 dark:text-violet-400 text-center mb-2">
-              Desglose
-            </p>
-            {datosDonut.map((d, i) => {
-              const pct = total > 0 ? ((d.value / total) * 100).toFixed(0) : "0";
-              const esActivo = activo === d.name;
-              return (
-                <motion.div
-                  key={d.name}
-                  initial={{ opacity: 0, x: 8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.3, delay: 0.15 + i * 0.05 }}
-                  onMouseEnter={() => setActivo(d.name)}
-                  onMouseLeave={() => setActivo(null)}
-                  className={`flex items-center gap-3 rounded-xl px-2 py-2 transition-all duration-300 cursor-default ${
-                    esActivo
-                      ? "bg-white dark:bg-neutral-900 shadow-sm scale-[1.01]"
-                      : "bg-white/40 dark:bg-neutral-900/30"
-                  }`}
-                >
-                  <span
-                    className="w-9 h-9 rounded-full shrink-0 flex items-center justify-center text-white text-xs font-black tabular-nums shadow-sm"
-                    style={{ backgroundColor: d.color }}
-                  >
-                    {d.value}
-                  </span>
-                  <span className="flex-1 text-xs font-semibold text-gray-700 dark:text-neutral-300 leading-tight">
-                    {d.name}
-                  </span>
-                  <span
-                    className="text-sm font-black tabular-nums shrink-0"
-                    style={{ color: d.color }}
-                  >
-                    {pct}%
-                  </span>
-                </motion.div>
-              );
-            })}
+          <div className="flex-1 overflow-hidden rounded-lg border border-gray-100 bg-gray-50/50 dark:border-neutral-800 dark:bg-neutral-900/40">
+            <table className="w-full table-fixed border-collapse text-left">
+              <colgroup>
+                <col />
+                <col className="w-[3.5rem]" />
+                <col className="w-[3rem]" />
+              </colgroup>
+              <thead>
+                <tr className="border-b border-gray-200 dark:border-neutral-700">
+                  <th className="px-3 pb-2 pt-2 text-[9px] font-bold uppercase tracking-wide text-gray-500 dark:text-neutral-400 md:text-[10px]">
+                    Categoría
+                  </th>
+                  <th className="px-3 pb-2 pt-2 text-right text-[9px] font-bold uppercase tracking-wide text-gray-500 dark:text-neutral-400 md:text-[10px]">
+                    Cant.
+                  </th>
+                  <th className="px-3 pb-2 pt-2 text-right text-[9px] font-bold uppercase tracking-wide text-gray-500 dark:text-neutral-400 md:text-[10px]">
+                    %
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {datosDonut.map((d) => {
+                  const pct =
+                    total > 0 ? ((d.value / total) * 100).toFixed(0) : "0";
+                  const esActivo = activo === d.name;
+                  return (
+                    <tr
+                      key={d.name}
+                      onMouseEnter={() => setActivo(d.name)}
+                      onMouseLeave={() => setActivo(null)}
+                      className={`cursor-default border-b border-gray-100 last:border-0 dark:border-neutral-800 ${
+                        esActivo
+                          ? "bg-white dark:bg-neutral-800/80"
+                          : "hover:bg-gray-50 dark:hover:bg-neutral-800/40"
+                      }`}
+                    >
+                      <td className="px-3 py-2.5">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span
+                            className="h-2.5 w-2.5 shrink-0 rounded-full"
+                            style={{ backgroundColor: d.color }}
+                          />
+                          <span className="truncate text-[9px] font-bold uppercase leading-snug text-gray-700 dark:text-neutral-300 md:text-[10px]">
+                            {d.name}
+                          </span>
+                        </div>
+                      </td>
+                      <td
+                        className="px-3 py-2.5 text-right text-xs font-black tabular-nums md:text-sm"
+                        style={{ color: d.color }}
+                      >
+                        {d.value}
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-[10px] font-semibold tabular-nums text-gray-500 dark:text-neutral-400 md:text-xs">
+                        {pct}%
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr className="border-t-2 border-gray-200 dark:border-neutral-700">
+                  <td className="px-3 py-2.5 text-[10px] font-black uppercase text-gray-800 dark:text-neutral-100">
+                    Total
+                  </td>
+                  <td className="px-3 py-2.5 text-right text-xs font-black tabular-nums text-gray-900 dark:text-white md:text-sm">
+                    {total}
+                  </td>
+                  <td className="px-3 py-2.5 text-right text-[10px] font-black tabular-nums text-gray-800 dark:text-neutral-100 md:text-xs">
+                    100%
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         ) : (
           <div className="flex-1 flex items-center justify-center text-xs text-gray-400 dark:text-neutral-500 italic">
