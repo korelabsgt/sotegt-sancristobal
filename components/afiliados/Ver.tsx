@@ -1064,33 +1064,31 @@ export default function Ver() {
           >
             <div className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity" />
           </TransitionChild>
-          <div className="fixed inset-0 z-10 overflow-y-auto">
-            <div className="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
-              <TransitionChild
-                as={Fragment}
-                enter="ease-out duration-300"
-                enterFrom="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                enterTo="opacity-100 translate-y-0 sm:scale-100"
-                leave="ease-in duration-200"
-                leaveFrom="opacity-100 translate-y-0 sm:scale-100"
-                leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-              >
-                <DialogPanel className="relative transform overflow-hidden rounded-3xl border border-gray-200/80 bg-white text-left text-gray-900 shadow-2xl shadow-black/10 transition-all dark:border-neutral-800 dark:bg-neutral-950 dark:text-gray-100 sm:my-8 sm:w-full sm:max-w-lg">
-                  <div className="p-5 md:p-6">
-                    <SignupForm
-                      key={signupFormKey}
-                      initialData={liderAEditar}
-                      onSuccess={handleSignupSuccess}
-                      onClose={handleCloseSignupModal}
-                      isModal
-                      rolSesion={rol}
-                      modoCrearSede={modoCrearSede}
-                      rolInicial={rolCreacionInicial}
-                    />
-                  </div>
-                </DialogPanel>
-              </TransitionChild>
-            </div>
+          <div className="fixed inset-0 z-10 flex items-stretch justify-center p-0 sm:items-center sm:p-6">
+            <TransitionChild
+              as={Fragment}
+              enter="ease-out duration-300"
+              enterFrom="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+              enterTo="opacity-100 translate-y-0 sm:scale-100"
+              leave="ease-in duration-200"
+              leaveFrom="opacity-100 translate-y-0 sm:scale-100"
+              leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+            >
+              <DialogPanel className="relative flex h-full max-h-[100dvh] w-full min-h-0 transform flex-col overflow-hidden border-0 bg-white text-left text-gray-900 shadow-2xl shadow-black/10 transition-all dark:bg-neutral-950 dark:text-gray-100 sm:h-auto sm:max-h-[90vh] sm:max-w-lg sm:rounded-3xl sm:border sm:border-gray-200/80 dark:sm:border-neutral-800">
+                <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] sm:p-6">
+                  <SignupForm
+                    key={signupFormKey}
+                    initialData={liderAEditar}
+                    onSuccess={handleSignupSuccess}
+                    onClose={handleCloseSignupModal}
+                    isModal
+                    rolSesion={rol}
+                    modoCrearSede={modoCrearSede}
+                    rolInicial={rolCreacionInicial}
+                  />
+                </div>
+              </DialogPanel>
+            </TransitionChild>
           </div>
         </Dialog>
       </Transition>

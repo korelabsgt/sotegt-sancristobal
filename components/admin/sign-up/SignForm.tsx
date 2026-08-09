@@ -335,8 +335,8 @@ export function SignupForm({
   };
 
   return (
-    <div className="relative mx-auto flex w-full flex-col gap-5 text-left md:max-w-xl">
-      <div className="flex items-start justify-between gap-3">
+    <div className="relative mx-auto flex h-full min-h-0 w-full flex-col gap-4 text-left sm:gap-5 md:max-w-xl">
+      <div className="flex shrink-0 items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
           <span
             className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${acento.accentSoft} ${acento.accent}`}
@@ -377,7 +377,7 @@ export function SignupForm({
         </div>
       ) : (
         <form
-          className="flex flex-col gap-4"
+          className="flex min-h-0 flex-1 flex-col gap-4"
           onSubmit={handleSubmit}
           noValidate
         >
@@ -475,21 +475,32 @@ export function SignupForm({
             </div>
           </div>
 
-          <Button
-            type="submit"
-            disabled={!formularioValido || loading}
-            className={`h-12 w-full rounded-xl text-base font-bold text-white shadow-sm ${acento.btn}`}
-          >
-            {loading
-              ? "Procesando..."
-              : isEdit
-                ? "Guardar cambios"
-                : modoCrearSede
-                  ? "Crear Sede"
-                  : modoSimulacion
-                    ? "Simular creación"
-                    : "Crear acceso"}
-          </Button>
+          <div className="mt-auto grid grid-cols-2 gap-2 pt-2 sm:pt-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={loading}
+              className="h-12 w-full rounded-xl border-gray-300 text-base font-bold text-gray-700 hover:bg-gray-100 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800"
+            >
+              Cerrar
+            </Button>
+            <Button
+              type="submit"
+              disabled={!formularioValido || loading}
+              className={`h-12 w-full rounded-xl text-base font-bold text-white shadow-sm ${acento.btn}`}
+            >
+              {loading
+                ? "Procesando..."
+                : isEdit
+                  ? "Guardar cambios"
+                  : modoCrearSede
+                    ? "Crear Sede"
+                    : modoSimulacion
+                      ? "Simular creación"
+                      : "Crear acceso"}
+            </Button>
+          </div>
         </form>
       )}
     </div>
