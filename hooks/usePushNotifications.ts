@@ -5,6 +5,11 @@ import {
   guardarSubscripcionAction,
   eliminarSubscripcionAction,
 } from "@/app/actions/push";
+import {
+  entornoPermiteIntentoPush,
+  esErrorServicioPushNoDisponible,
+  esIOSSinPWA,
+} from "@/lib/pushAyuda";
 
 const SW_URL = "/push/sw.js";
 const SW_SCOPE = "/push/";
@@ -20,19 +25,6 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
     outputArray[i] = rawData.charCodeAt(i);
   }
   return outputArray;
-}
-
-function esIOSSinPWA(): boolean {
-  if (typeof window === "undefined") return false;
-  const ua = navigator.userAgent;
-  const esIOS =
-    /iPad|iPhone|iPod/.test(ua) ||
-    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-  const esPWA =
-    window.matchMedia("(display-mode: standalone)").matches ||
-    (window.navigator as Navigator & { standalone?: boolean }).standalone ===
-      true;
-  return esIOS && !esPWA;
 }
 
 async function obtenerVapidPublicKey(): Promise<string> {
@@ -100,6 +92,21 @@ async function ensurePushRegistration(): Promise<ServiceWorkerRegistration> {
   return esperarActivacion(reg);
 }
 
+async function servicioPushDisponible(
+  reg: ServiceWorkerRegistration,
+  vapidKey: string,
+): Promise<boolean> {
+  try {
+    await reg.pushManager.permissionState({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(vapidKey),
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function comprobarSuscripcionActiva(): Promise<boolean> {
   if (Notification.permission !== "granted") return false;
 
@@ -126,13 +133,7 @@ export default function usePushNotifications() {
     let cancelado = false;
 
     (async () => {
-      const navegadorOk =
-        typeof window !== "undefined" &&
-        "serviceWorker" in navigator &&
-        "PushManager" in window &&
-        "Notification" in window;
-
-      if (!navegadorOk) {
+      if (!entornoPermiteIntentoPush()) {
         if (!cancelado) {
           setSoportado(false);
           setCargando(false);
@@ -144,9 +145,10 @@ export default function usePushNotifications() {
       if (cancelado) return;
 
       if (!key) {
-        console.warn("[push] Falta NEXT_PUBLIC_VAPID_PUBLIC_KEY en el deploy");
-        setSoportado(false);
-        setCargando(false);
+        if (!cancelado) {
+          setSoportado(false);
+          setCargando(false);
+        }
         return;
       }
 
@@ -156,8 +158,8 @@ export default function usePushNotifications() {
       try {
         const yaActivo = await comprobarSuscripcionActiva();
         if (!cancelado) setActivo(yaActivo);
-      } catch (e) {
-        console.error("[push] Error comprobando suscripción:", e);
+      } catch {
+        if (!cancelado) setActivo(false);
       } finally {
         if (!cancelado) setCargando(false);
       }
@@ -169,10 +171,14 @@ export default function usePushNotifications() {
   }, []);
 
   const activar = useCallback(async () => {
-    if (!soportado || procesando || !vapidKey) return;
+    if (procesando) return;
 
-    if (esIOSSinPWA()) {
-      return { ok: false, motivo: "ios-sin-pwa" as const };
+    if (!entornoPermiteIntentoPush() || esIOSSinPWA()) {
+      return { ok: false, motivo: "instalar-app" as const };
+    }
+
+    if (!soportado || !vapidKey) {
+      return { ok: false, motivo: "instalar-app" as const };
     }
 
     setProcesando(true);
@@ -184,6 +190,13 @@ export default function usePushNotifications() {
       }
 
       const reg = await ensurePushRegistration();
+
+      const pushOk = await servicioPushDisponible(reg, vapidKey);
+      if (!pushOk) {
+        setSoportado(false);
+        setActivo(false);
+        return { ok: false, motivo: "instalar-app" as const };
+      }
 
       let sub = await reg.pushManager.getSubscription();
       if (!sub) {
@@ -208,9 +221,12 @@ export default function usePushNotifications() {
       setActivo(true);
       return { ok: true as const };
     } catch (e) {
-      console.error("[push] Error activando notificaciones:", e);
       setActivo(false);
-      return { ok: false, motivo: "error" as const };
+      if (esErrorServicioPushNoDisponible(e)) {
+        setSoportado(false);
+        return { ok: false, motivo: "instalar-app" as const };
+      }
+      return { ok: false, motivo: "instalar-app" as const };
     } finally {
       setProcesando(false);
     }
@@ -231,8 +247,7 @@ export default function usePushNotifications() {
       }
       setActivo(false);
       return { ok: true as const };
-    } catch (e) {
-      console.error("[push] Error desactivando notificaciones:", e);
+    } catch {
       return { ok: false as const };
     } finally {
       setProcesando(false);
@@ -240,8 +255,10 @@ export default function usePushNotifications() {
   }, [soportado, procesando]);
 
   const toggle = useCallback(async () => {
-    return activo ? desactivar() : activar();
-  }, [activo, activar, desactivar]);
+    if (!activo) return activar();
+    if (!soportado) return { ok: false, motivo: "no-soportado" as const };
+    return desactivar();
+  }, [activo, activar, desactivar, soportado]);
 
   return {
     soportado,

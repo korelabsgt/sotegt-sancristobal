@@ -43,9 +43,8 @@ export function swalNoEliminarCelula() {
   });
 }
 
-export function swalConfirmarEliminacion(nombreCompleto: string, esLider: boolean) {
+export function swalConfirmarEliminacion(nombreCompleto: string) {
   const isDark = isDarkModeActive();
-  const tabla = esLider ? " (LÍDER DE CÉLULA)" : "";
 
   return Swal.fire({
     ...swalThemeOptions({
@@ -53,7 +52,7 @@ export function swalConfirmarEliminacion(nombreCompleto: string, esLider: boolea
       cancelButtonClass: isDark ? "swal-btn-outline-blue" : "swal-btn-outline-blue-light",
     }),
     title: "¿Está seguro?",
-    text: `Se eliminará permanentemente a "${nombreCompleto}"${tabla}.`,
+    text: `Se eliminará permanentemente a "${nombreCompleto}".`,
     icon: "warning",
     showCancelButton: true,
     reverseButtons: true,

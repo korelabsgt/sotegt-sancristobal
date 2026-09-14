@@ -8,7 +8,7 @@ export const eliminar = async (registro: Afiliado | Lider, onEliminado: () => vo
     const nombreCompleto = `${registro.nombres} ${registro.apellidos}`;
     const esLider = 'email' in registro;
 
-    const confirmacion = await swalConfirmarEliminacion(nombreCompleto, esLider);
+    const confirmacion = await swalConfirmarEliminacion(nombreCompleto);
 
     if (confirmacion.isConfirmed) {
         let mensajeError: string | undefined = undefined;
