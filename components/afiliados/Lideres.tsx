@@ -26,6 +26,7 @@ import {
 import type { TemaLista } from "./temaPestana";
 import { TEMA_LIDERES, temaDesdeLider } from "./temaPestana";
 import { esUsuarioSede } from "./esquemas";
+import { metasPorRol } from "@/lib/metasAfiliacion";
 
 export interface Lider {
   id: string;
@@ -103,9 +104,6 @@ export default function Lideres({
     refetchOnMount: false,
   });
 
-  const META_CELULA = config?.meta_por_lider ?? config?.meta_celula ?? 15;
-  const META_MINIMA = config?.meta_celula_minima ?? 10;
-
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, itemsPerPage]);
@@ -167,7 +165,11 @@ export default function Lideres({
         <AnimatePresence initial={false}>
           {lideresPaginados.map((lider, index) => {
             const totalEnGrupo = lider.conteoAfiliados || 0;
-            const progreso = Math.min((totalEnGrupo / META_CELULA) * 100, 100);
+            const { meta: metaCelula, min: metaMinima } = metasPorRol(
+              config,
+              lider.rol,
+            );
+            const progreso = Math.min((totalEnGrupo / metaCelula) * 100, 100);
             const tieneAfiliados = totalEnGrupo > 0;
             const esSede = esUsuarioSede(lider);
             const {
@@ -176,8 +178,8 @@ export default function Lideres({
               textoColor,
             } = calcularNivelCompromiso(
               totalEnGrupo,
-              META_CELULA,
-              META_MINIMA,
+              metaCelula,
+              metaMinima,
               lider.nombres,
             );
 
@@ -303,7 +305,7 @@ export default function Lideres({
                         <span
                           className={`text-xs md:text-sm font-black leading-none ${textoColor}`}
                         >
-                          {totalEnGrupo}/{META_CELULA}
+                          {totalEnGrupo}/{metaCelula}
                         </span>
                       </div>
                       <div

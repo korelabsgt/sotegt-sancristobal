@@ -10,7 +10,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { ChevronUp, X } from "lucide-react";
+import { ChevronUp, UsersRound, X } from "lucide-react";
 import { toast } from "@/lib/toast";
 import PasswordSection from "@/components/admin/sign-up/PasswordSection";
 import useUserData from "@/hooks/sesion/useUserData";
@@ -23,7 +23,7 @@ import {
   PiMedalDuotone,
   PiShieldCheckDuotone,
 } from "react-icons/pi";
-import type { IconType } from "react-icons";
+import type { ElementType } from "react";
 
 interface RolDisponible {
   id: number;
@@ -37,11 +37,11 @@ interface SignupFormProps {
   initialData?: any;
   rolSesion?: string;
   modoCrearSede?: boolean;
-  rolInicial?: "LIDER" | "EMPLEADO" | "ADMIN" | "SUPER" | null;
+  rolInicial?: "LIDER" | "COORDINADOR" | "EMPLEADO" | "ADMIN" | "SUPER" | null;
 }
 
 type AcentoVisual = {
-  Icon: IconType;
+  Icon: ElementType;
   accent: string;
   accentSoft: string;
   ring: string;
@@ -71,6 +71,19 @@ function acentoPorContexto(
       accentSoft: "bg-violet-50 dark:bg-violet-950/40",
       ring: "focus-visible:ring-violet-500/30",
       btn: "bg-violet-600 hover:bg-violet-700 dark:bg-violet-600 dark:hover:bg-violet-500",
+    };
+  }
+  if (
+    nombre === "COORDINADOR" ||
+    nombre === "COORDINADORES" ||
+    rolInicial === "COORDINADOR"
+  ) {
+    return {
+      Icon: UsersRound,
+      accent: "text-cyan-700 dark:text-cyan-400",
+      accentSoft: "bg-cyan-50 dark:bg-cyan-950/40",
+      ring: "focus-visible:ring-cyan-500/30",
+      btn: "bg-cyan-600 hover:bg-cyan-700 dark:bg-cyan-600 dark:hover:bg-cyan-500",
     };
   }
   if (nombre === "ADMIN" || nombre === "ADMINISTRADOR") {
@@ -216,6 +229,16 @@ export function SignupForm({
               return n === "EMPLEADO" || n === "TRABAJADOR";
             });
             if (rolEmpleado) setRolId(rolEmpleado.id.toString());
+          } else if (rolInicial === "COORDINADOR") {
+            const rolCoord = r.find((role) => {
+              const n = role.nombre.toUpperCase();
+              return (
+                role.id === 6 ||
+                n === "COORDINADOR" ||
+                n === "COORDINADORES"
+              );
+            });
+            if (rolCoord) setRolId(rolCoord.id.toString());
           } else if (rolInicial === "ADMIN") {
             const rolAdmin = r.find(
               (role) => role.nombre.toUpperCase() === "ADMIN",
@@ -278,11 +301,13 @@ export function SignupForm({
           ? "Nuevo Enlace (simulación)"
           : rolInicial === "EMPLEADO"
             ? "Nuevo Empleado"
-            : rolInicial === "ADMIN"
-              ? "Nuevo Admin"
-              : rolInicial === "SUPER"
-                ? "Nuevo Super"
-                : "Nuevo Enlace";
+            : rolInicial === "COORDINADOR"
+              ? "Nuevo Coordinador"
+              : rolInicial === "ADMIN"
+                ? "Nuevo Admin"
+                : rolInicial === "SUPER"
+                  ? "Nuevo Super"
+                  : "Nuevo Enlace";
 
   const acento = acentoPorContexto(
     modoCrearSede,

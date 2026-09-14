@@ -9,6 +9,7 @@ import {
   FileBarChart,
   Pencil,
   Trash2,
+  UsersRound,
   X,
 } from "lucide-react";
 import {
@@ -49,6 +50,7 @@ import Padron from "./Padron";
 import PanelListaPestana from "./PanelListaPestana";
 import {
   TEMA_ADMIN,
+  TEMA_COORDINADORES,
   TEMA_EMPLEADOS,
   TEMA_LIDERES,
   TEMA_MIEMBROS,
@@ -56,7 +58,7 @@ import {
   type TemaLista,
 } from "./temaPestana";
 import type { Afiliado, Lider } from "./esquemas";
-import { esRolEmpleado, esUsuarioSede } from "./esquemas";
+import { esRolCoordinador, esRolEmpleado, esUsuarioSede } from "./esquemas";
 import Form from "./forms/afiliados/Afiliados";
 import ReporteLideresClasificacion from "./reportes/ReporteLideresClasificacion";
 import { eliminar } from "./acciones";
@@ -74,6 +76,7 @@ type Lugar = {
 
 type Tab =
   | "Sede"
+  | "Coordinadores"
   | "Lideres"
   | "Afiliados"
   | "Empleados"
@@ -97,6 +100,12 @@ const TAB_THEMES: Record<
     activeIconBg: "bg-blue-100 dark:bg-blue-950/60",
     activeIconText: "text-blue-700 dark:text-blue-400",
     lineBg: "bg-blue-500 dark:bg-blue-400",
+  },
+  Coordinadores: {
+    activeText: "text-cyan-600 dark:text-cyan-400",
+    activeIconBg: "bg-cyan-100 dark:bg-cyan-950/60",
+    activeIconText: "text-cyan-600 dark:text-cyan-400",
+    lineBg: "bg-cyan-500 dark:bg-cyan-400",
   },
   Lideres: {
     activeText: "text-orange-600 dark:text-orange-400",
@@ -140,6 +149,7 @@ const tabEase = [0.25, 0.46, 0.45, 0.94] as const;
 
 const TAB_ORDER: Tab[] = [
   "Sede",
+  "Coordinadores",
   "Lideres",
   "Empleados",
   "Afiliados",
@@ -185,7 +195,7 @@ export default function Ver() {
   const [signupFormKey, setSignupFormKey] = useState(0);
   const [modoCrearSede, setModoCrearSede] = useState(false);
   const [rolCreacionInicial, setRolCreacionInicial] = useState<
-    "LIDER" | "EMPLEADO" | "ADMIN" | "SUPER" | null
+    "LIDER" | "COORDINADOR" | "EMPLEADO" | "ADMIN" | "SUPER" | null
   >(null);
 
   const [afiliadoParaEditar, setAfiliadoParaEditar] = useState<Afiliado | null>(
@@ -251,7 +261,14 @@ export default function Ver() {
 
   const esRolLiderOEmpleado = (rolUsuario?: string | null) => {
     const n = (rolUsuario || "").toUpperCase().trim();
-    return n === "LIDER" || n === "LÍDER" || n === "EMPLEADO" || n === "TRABAJADOR";
+    return (
+      n === "LIDER" ||
+      n === "LÍDER" ||
+      n === "COORDINADOR" ||
+      n === "COORDINADORES" ||
+      n === "EMPLEADO" ||
+      n === "TRABAJADOR"
+    );
   };
 
   const handleSimular = () => {
@@ -339,6 +356,12 @@ export default function Ver() {
     (acc, u) => acc + (u.conteoAfiliados || 0),
     0,
   );
+  const coordinadores = allUsers.filter((u) => esRolCoordinador(u.rol));
+  const totalCoordinadoresRegistrados = coordinadores.length;
+  const totalAfiliadosCoordinadores = coordinadores.reduce(
+    (acc, u) => acc + (u.conteoAfiliados || 0),
+    0,
+  );
   const lugares = (dashboardData?.lugares || []) as Lugar[];
 
   const lideres = (() => {
@@ -356,10 +379,14 @@ export default function Ver() {
 
   const lideresVisibles = (() => {
     const base = liderSimulado ? [liderSimulado, ...lideres] : lideres;
-    return base.filter(
-      (l) => (l.rol || "").toUpperCase() !== "DOCUMENTADOR" && !esUsuarioSede(l),
-    );
+    return base.filter((l) => {
+      if (l.simulado) return true;
+      const r = (l.rol || "").toUpperCase();
+      return (r === "LIDER" || r === "LÍDER") && !esUsuarioSede(l);
+    });
   })();
+
+  const coordinadoresVisibles = coordinadores;
 
   const lideresParaFormulario = esAdminOSuper
     ? lideresVisibles
@@ -369,6 +396,7 @@ export default function Ver() {
   const totalAdministrativosRegistrados = administrativos.length;
   const totalMiembrosGeneral =
     (haySedeHabilitada ? totalAfiliadosSede : 0) +
+    totalAfiliadosCoordinadores +
     totalAfiliadosLideres +
     (hayEmpleadosHabilitada ? totalAfiliadosEmpleados : 0) +
     (liderSimulado ? AFILIADOS_SIMULADOS.length : 0);
@@ -395,10 +423,16 @@ export default function Ver() {
   };
 
   const handleOpenCreateUsuarioModal = (
-    rol: "LIDER" | "EMPLEADO" | "ADMIN" | "SUPER",
+    rol: "LIDER" | "COORDINADOR" | "EMPLEADO" | "ADMIN" | "SUPER",
   ) => {
     if (rol === "SUPER" && !puedeCrearRolSuper) return;
-    if (esSedeSesion && rol !== "LIDER" && rol !== "EMPLEADO") return;
+    if (
+      esSedeSesion &&
+      rol !== "LIDER" &&
+      rol !== "COORDINADOR" &&
+      rol !== "EMPLEADO"
+    )
+      return;
     setLiderAEditar(null);
     setModoCrearSede(false);
     setRolCreacionInicial(rol);
@@ -488,6 +522,8 @@ export default function Ver() {
     switch (tab) {
       case "Sede":
         return TEMA_SEDE;
+      case "Coordinadores":
+        return TEMA_COORDINADORES;
       case "Lideres":
         return TEMA_LIDERES;
       case "Empleados":
@@ -502,6 +538,7 @@ export default function Ver() {
   };
 
   const placeholdersTab: Partial<Record<Tab, string>> = {
+    Coordinadores: "Buscar por nombre...",
     Lideres: "Buscar por nombre...",
     Empleados: "Buscar por nombre...",
     Afiliados: "Buscar por nombre o DPI...",
@@ -605,9 +642,11 @@ export default function Ver() {
               totalSede={totalAfiliadosSede}
               totalLideres={totalAfiliadosLideres}
               totalEmpleados={totalAfiliadosEmpleados}
+              totalCoordinadores={totalAfiliadosCoordinadores}
               objetivoTotal={configSis?.objetivo_total || 0}
               mostrarSede={haySedeHabilitada}
               mostrarEmpleados={hayEmpleadosHabilitada}
+              mostrarCoordinadores
             />
             {miPerfilGlobal ? (
               <Celula
@@ -631,9 +670,11 @@ export default function Ver() {
               totalSede={totalAfiliadosSede}
               totalLideres={totalAfiliadosLideres}
               totalEmpleados={totalAfiliadosEmpleados}
+              totalCoordinadores={totalAfiliadosCoordinadores}
               objetivoTotal={configSis?.objetivo_total || 0}
               mostrarSede={haySedeHabilitada}
               mostrarEmpleados={hayEmpleadosHabilitada}
+              mostrarCoordinadores
             />
             <div className="mb-6 w-full min-w-0 border-b border-gray-200 dark:border-neutral-800">
               <div className="grid w-full min-w-0 grid-cols-2 gap-1 sm:gap-0 md:flex md:flex-nowrap md:overflow-x-auto">
@@ -645,6 +686,13 @@ export default function Ver() {
                       count: totalAfiliadosSede,
                       icon: PiBuildingsDuotone,
                       show: haySedeHabilitada,
+                    },
+                    {
+                      id: "Coordinadores" as Tab,
+                      label: "Coordinadores",
+                      count: totalCoordinadoresRegistrados,
+                      icon: UsersRound,
+                      show: puedeCrearLiderOEmpleado,
                     },
                     {
                       id: "Lideres" as Tab,
@@ -841,6 +889,34 @@ export default function Ver() {
                         )}
                       </div>
                     ))}
+
+                  {activeTab === "Coordinadores" &&
+                    puedeCrearLiderOEmpleado &&
+                    renderPanelTab(
+                      "Coordinadores",
+                      <Lideres
+                        lideres={coordinadoresVisibles}
+                        onVerCelula={handleOpenCelula}
+                        onEditar={handleOpenEditLiderModal}
+                        rolUsuarioSesion={rolSesionCelula}
+                        onDataChange={refreshAfterDeletion}
+                        searchTerm={searchTerm}
+                        idUsuarioSesion={userId}
+                        isLoading={cargandoLideres}
+                        tema={getTemaTab("Coordinadores")}
+                      />,
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() =>
+                          handleOpenCreateUsuarioModal("COORDINADOR")
+                        }
+                        className="gap-1.5 h-10 px-3 text-sm font-semibold border-cyan-500 text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/40 hover:bg-cyan-100 dark:hover:bg-cyan-950/60 shadow-sm w-full sm:w-auto"
+                      >
+                        <UsersRound className="w-4 h-4 shrink-0" />
+                        Nuevo Coordinador
+                      </Button>,
+                    )}
 
                   {activeTab === "Lideres" &&
                     renderPanelTab(

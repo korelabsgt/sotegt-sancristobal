@@ -14,7 +14,7 @@ import {
 import { AnimatePresence, motion } from "framer-motion";
 import * as XLSX from "xlsx";
 import type { Afiliado, Lider } from "./esquemas";
-import { esRolEmpleado, esUsuarioSede } from "./esquemas";
+import { esRolCoordinador, esRolEmpleado, esUsuarioSede } from "./esquemas";
 import { formatearDpi, TelefonoInline } from "./contacto";
 import { etiquetaEdadNacimiento } from "./fechaNacimiento";
 import { Button } from "@/components/ui/button";
@@ -187,7 +187,7 @@ export default function AfiliadosGeneral({
         });
         return;
       }
-      if (rol === "LIDER") {
+      if (rol === "LIDER" || rol === "LÍDER" || esRolCoordinador(rol)) {
         result.push({
           lider,
           afiliados: grouped.get(lider.id) || [],

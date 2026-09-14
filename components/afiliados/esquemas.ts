@@ -39,6 +39,11 @@ export function esRolEmpleado(rol?: string | null) {
   return r === "EMPLEADO" || r === "TRABAJADOR";
 }
 
+export function esRolCoordinador(rol?: string | null) {
+  const r = (rol || "").toUpperCase().trim();
+  return r === "COORDINADOR" || r === "COORDINADORES";
+}
+
 export const POLITICAS = [
   "Obras de Infraestructura",
   "Red Vial",

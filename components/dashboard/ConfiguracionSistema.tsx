@@ -46,6 +46,17 @@ interface Props {
   onClose?: () => void;
 }
 
+function requerimientoMeta(
+  objetivo: number,
+  metaLider: number,
+  metaCoordinador: number,
+) {
+  const enlaces = metaLider > 0 ? Math.ceil(objetivo / metaLider) : 0;
+  const coordinadores =
+    metaCoordinador > 0 ? Math.ceil(objetivo / metaCoordinador) : 0;
+  return { enlaces, coordinadores, total: enlaces + coordinadores };
+}
+
 export default function ConfiguracionSistema({
   showMetas = true,
   allowEditing = true,
@@ -72,6 +83,8 @@ export default function ConfiguracionSistema({
   const [objetivoTotal, setObjetivoTotal] = useState(0);
   const [metaPorLider, setMetaPorLider] = useState(0);
   const [metaCelulaMinima, setMetaCelulaMinima] = useState(10);
+  const [metaPorCoordinador, setMetaPorCoordinador] = useState(0);
+  const [metaCoordinadorMinima, setMetaCoordinadorMinima] = useState(0);
   const [padronPrecargado, setPadronPrecargado] = useState(false);
   const [haySede, setHaySede] = useState(true);
   const [hayEmpleados, setHayEmpleados] = useState(false);
@@ -89,6 +102,8 @@ export default function ConfiguracionSistema({
     setObjetivoTotal(config.objetivo_total || 0);
     setMetaPorLider(config.meta_por_lider || config.meta_celula || 0);
     setMetaCelulaMinima(config.meta_celula_minima ?? 10);
+    setMetaPorCoordinador(config.meta_por_coordinador ?? 0);
+    setMetaCoordinadorMinima(config.meta_coordinador_minima ?? 0);
     setPadronPrecargado(config.padron ?? false);
     setHaySede(config.hay_sede ?? true);
     setHayEmpleados(config.hay_empleados ?? false);
@@ -407,6 +422,15 @@ export default function ConfiguracionSistema({
       showWarningToast("La meta mínima debe ser menor que la meta por líder");
       return;
     }
+    if (
+      metaPorCoordinador > 0 &&
+      metaCoordinadorMinima >= metaPorCoordinador
+    ) {
+      showWarningToast(
+        "La meta mínima de coordinador debe ser menor que la meta por coordinador",
+      );
+      return;
+    }
 
     try {
       setGuardando(true);
@@ -421,6 +445,8 @@ export default function ConfiguracionSistema({
         metaCelulaMinima,
         config?.hay_sede ?? true,
         config?.hay_empleados ?? false,
+        metaPorCoordinador,
+        metaCoordinadorMinima,
       );
       queryClient.setQueryData(["config_sistema"], result);
       showSuccessToast("Metas guardadas correctamente");
@@ -607,7 +633,7 @@ export default function ConfiguracionSistema({
                 Configuración de Metas
               </h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                 <div className="space-y-1.5">
                   <label className="text-xs font-black text-blue-800 dark:text-blue-300 uppercase ml-1">
                     Objetivo Total
@@ -644,23 +670,86 @@ export default function ConfiguracionSistema({
                     className="h-12 text-2xl font-black text-blue-900 dark:text-blue-200 border-2 border-blue-300 dark:border-blue-600 focus:border-blue-600 dark:focus:border-blue-500 bg-white dark:bg-neutral-800 text-center"
                   />
                 </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-black text-cyan-800 dark:text-cyan-300 uppercase ml-1">
+                    Meta por Coordinador
+                  </label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={metaPorCoordinador}
+                    onChange={(e) =>
+                      setMetaPorCoordinador(Number(e.target.value) || 0)
+                    }
+                    className="h-12 text-2xl font-black text-cyan-900 dark:text-cyan-200 border-2 border-cyan-300 dark:border-cyan-600 focus:border-cyan-600 dark:focus:border-cyan-500 bg-white dark:bg-neutral-800 text-center"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-black text-cyan-800 dark:text-cyan-300 uppercase ml-1">
+                    Meta Mínima Coordinador
+                  </label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={metaCoordinadorMinima}
+                    onChange={(e) =>
+                      setMetaCoordinadorMinima(Number(e.target.value) || 0)
+                    }
+                    className="h-12 text-2xl font-black text-cyan-900 dark:text-cyan-200 border-2 border-cyan-300 dark:border-cyan-600 focus:border-cyan-600 dark:focus:border-cyan-500 bg-white dark:bg-neutral-800 text-center"
+                  />
+                </div>
               </div>
 
-              {objetivoTotal > 0 && metaPorLider > 0 && (
-                <div className="mt-4 p-5 bg-blue-600 rounded-2xl shadow-lg flex items-center justify-between text-white">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-bold uppercase opacity-80">
-                      Requerimiento de Células
-                    </span>
-                    <span className="text-base font-bold">
-                      Líderes necesarios para la meta
-                    </span>
+              {objetivoTotal > 0 &&
+                (metaPorLider > 0 || metaPorCoordinador > 0) && (
+                  <div className="mt-4 p-5 bg-blue-600 rounded-2xl shadow-lg text-white space-y-3">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-bold uppercase opacity-80">
+                          Requerimiento de Células
+                        </span>
+                        <span className="text-base font-bold">
+                          Líderes necesarios para la meta
+                        </span>
+                      </div>
+                      <div className="text-4xl font-black tabular-nums">
+                        {
+                          requerimientoMeta(
+                            objetivoTotal,
+                            metaPorLider,
+                            metaPorCoordinador,
+                          ).total
+                        }
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-3 text-xs font-bold uppercase tracking-wide opacity-90">
+                      {metaPorCoordinador > 0 && (
+                        <span className="rounded-full bg-white/15 px-3 py-1">
+                          Coordinadores:{" "}
+                          {
+                            requerimientoMeta(
+                              objetivoTotal,
+                              metaPorLider,
+                              metaPorCoordinador,
+                            ).coordinadores
+                          }
+                        </span>
+                      )}
+                      {metaPorLider > 0 && (
+                        <span className="rounded-full bg-white/15 px-3 py-1">
+                          Enlaces:{" "}
+                          {
+                            requerimientoMeta(
+                              objetivoTotal,
+                              metaPorLider,
+                              metaPorCoordinador,
+                            ).enlaces
+                          }
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-4xl font-black">
-                    {Math.ceil(objetivoTotal / metaPorLider)}
-                  </div>
-                </div>
-              )}
+                )}
 
               <div className="pt-6 border-t border-blue-100 dark:border-blue-900 flex justify-end">
                 <Button
@@ -1089,18 +1178,21 @@ export default function ConfiguracionSistema({
                     rol === "ADMINISTRADOR" ||
                     rol === "ADMIN") &&
                     currentConfig.objetivo_total > 0 &&
-                    currentConfig.meta_por_lider > 0 && (
+                    (currentConfig.meta_por_lider > 0 ||
+                      (currentConfig.meta_por_coordinador ?? 0) > 0) && (
                       <div className="mt-2 bg-blue-50/50 dark:bg-blue-950/40 px-4 py-1.5 rounded-full border border-blue-100/50 dark:border-blue-800/50">
                         <p className="text-xs md:text-lg font-black text-blue-900/60 dark:text-blue-300/80 uppercase tracking-tight">
                           Se requieren{" "}
                           <span className="text-blue-600 text-sm md:text-2xl">
-                            {Math.ceil(
-                              currentConfig.objetivo_total /
+                            {
+                              requerimientoMeta(
+                                currentConfig.objetivo_total,
                                 currentConfig.meta_por_lider,
-                            )}{" "}
-                            enlaces
+                                currentConfig.meta_por_coordinador ?? 0,
+                              ).total
+                            }
                           </span>{" "}
-                          para la meta
+                          líderes para la meta
                         </p>
                       </div>
                     )}
@@ -1141,17 +1233,21 @@ export default function ConfiguracionSistema({
                   </div>
                 </motion.div>
                 {currentConfig.objetivo_total > 0 &&
-                  currentConfig.meta_por_lider > 0 && (
+                  (currentConfig.meta_por_lider > 0 ||
+                    (currentConfig.meta_por_coordinador ?? 0) > 0) && (
                     <motion.p
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       className="mt-2 text-xs font-bold text-blue-900 uppercase tracking-widest"
                     >
-                      {Math.ceil(
-                        currentConfig.objetivo_total /
+                      {
+                        requerimientoMeta(
+                          currentConfig.objetivo_total,
                           currentConfig.meta_por_lider,
-                      )}{" "}
-                      <span className="text-gray-500">líderes nesesarios</span>
+                          currentConfig.meta_por_coordinador ?? 0,
+                        ).total
+                      }{" "}
+                      <span className="text-gray-500">líderes necesarios</span>
                     </motion.p>
                   )}
               </div>

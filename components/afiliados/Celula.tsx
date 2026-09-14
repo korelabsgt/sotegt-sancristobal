@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { Afiliado, Lider } from "./esquemas";
-import { esRolEmpleado, esUsuarioSede } from "./esquemas";
+import { esRolCoordinador, esRolEmpleado, esUsuarioSede } from "./esquemas";
 import Tabla from "./Tabla";
 import EstadisticasTabs from "./estadisticas/EstadisticasTabs";
 import TextoAnimado from "@/components/ui/Typeanimation";
@@ -27,9 +27,11 @@ import { calcularNivelCompromiso } from "@/lib/nivelCompromiso";
 import MensajesEnviados from "./MensajesEnviados";
 import type { FormatoVista } from "./Tabla";
 import { temaDesdeLider } from "./temaPestana";
+import { metasPorRol } from "@/lib/metasAfiliacion";
 
 function etiquetaRolCelula(lider: Lider): string {
   if (esRolEmpleado(lider.rol)) return "Empleado";
+  if (esRolCoordinador(lider.rol)) return "Coordinador";
   if (esUsuarioSede(lider)) return "Sede";
   return "Líder de enlace";
 }
@@ -114,8 +116,10 @@ export default function Celula({
     : afiliadosDelLider;
 
   const totalEnGrupo = afiliadosDelLider.filter((a: Afiliado) => !a.familiar_de).length;
-  const META_CELULA = config?.meta_por_lider ?? config?.meta_celula ?? 15;
-  const META_MINIMA = config?.meta_celula_minima ?? 10;
+  const { meta: META_CELULA, min: META_MINIMA } = metasPorRol(
+    config,
+    lider.rol,
+  );
   const objetivo = META_CELULA;
   const progreso = Math.min((totalEnGrupo / objetivo) * 100, 100);
 

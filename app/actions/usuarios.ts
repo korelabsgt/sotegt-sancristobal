@@ -33,6 +33,8 @@ function esRolLiderOEmpleadoNombre(nombre: string): boolean {
   return (
     nombre === "LIDER" ||
     nombre === "LÍDER" ||
+    nombre === "COORDINADOR" ||
+    nombre === "COORDINADORES" ||
     nombre === "EMPLEADO" ||
     nombre === "TRABAJADOR"
   );

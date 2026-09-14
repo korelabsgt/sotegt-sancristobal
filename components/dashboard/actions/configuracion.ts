@@ -78,6 +78,8 @@ export async function actualizarConfiguracionAction(
   meta_celula_minima: number = 10,
   hay_sede: boolean = true,
   hay_empleados: boolean = false,
+  meta_por_coordinador: number = 0,
+  meta_coordinador_minima: number = 0,
 ) {
   return guardarConfiguracion({
     nombre_candidato,
@@ -90,6 +92,8 @@ export async function actualizarConfiguracionAction(
     meta_celula_minima,
     hay_sede,
     hay_empleados,
+    meta_por_coordinador,
+    meta_coordinador_minima,
   });
 }
 

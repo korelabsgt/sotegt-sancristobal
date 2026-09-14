@@ -90,6 +90,30 @@ export const TEMA_EMPLEADOS: TemaLista = {
   filaHover: "hover:bg-violet-50/60 dark:hover:bg-violet-950/20",
 };
 
+export const TEMA_COORDINADORES: TemaLista = {
+  borderTop: "border-t-cyan-500",
+  theadText: "text-cyan-600 dark:text-cyan-400",
+  theadBg: "bg-cyan-50 dark:bg-cyan-950/30",
+  focusRing: "focus-visible:ring-cyan-500",
+  btnOutline: "border-cyan-500 text-cyan-600 dark:border-cyan-400 dark:text-cyan-400",
+  btnPrimary:
+    "border-cyan-500 bg-cyan-50 text-cyan-600 hover:bg-cyan-100 dark:border-cyan-500 dark:bg-cyan-950/50 dark:text-cyan-400 dark:hover:bg-cyan-950/70",
+  btnText: "text-cyan-600 dark:text-cyan-400",
+  btnHover: "hover:bg-cyan-50 dark:hover:bg-cyan-950/40",
+  activeToggle: "bg-cyan-100 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-400 shadow-sm",
+  pagination: "text-cyan-600 dark:text-cyan-400",
+  hoverEntrar:
+    "group-hover:border-cyan-500 group-hover:bg-cyan-50 group-hover:text-cyan-600 dark:group-hover:border-cyan-400 dark:group-hover:bg-cyan-950/50 dark:group-hover:text-cyan-400",
+  hoverMenu: "group-hover:text-cyan-600 dark:group-hover:text-cyan-400",
+  hoverBordeLateral:
+    "hover:border-l-cyan-500 hover:border-r-cyan-500 dark:hover:border-l-cyan-400 dark:hover:border-r-cyan-400",
+  telefonoPill:
+    "border-cyan-200 bg-cyan-50 text-cyan-800 hover:bg-cyan-100 dark:border-cyan-800/50 dark:bg-cyan-900/20 dark:text-cyan-300 dark:hover:bg-cyan-900/40",
+  telefonoBar: "bg-cyan-50 text-cyan-800 dark:bg-cyan-950/30 dark:text-cyan-200",
+  cardBorder: "border-cyan-200 dark:border-cyan-800/60",
+  filaHover: "hover:bg-cyan-50/60 dark:hover:bg-cyan-950/20",
+};
+
 export const TEMA_MIEMBROS: TemaLista = {
   borderTop: "border-t-sky-500",
   theadText: "text-sky-600 dark:text-sky-400",
@@ -192,6 +216,8 @@ export function temaDesdeLider(
 ): TemaLista {
   if (esSede) return TEMA_SEDE;
   const r = (lider.rol || "").toUpperCase();
+  if (r === "COORDINADOR" || r === "COORDINADORES") return TEMA_COORDINADORES;
+  if (r === "LIDER" || r === "LÍDER") return TEMA_LIDERES;
   if (r === "EMPLEADO" || r === "TRABAJADOR") return TEMA_EMPLEADOS;
   if (r === "ADMIN" || r === "ADMINISTRADOR") return TEMA_ADMIN;
   if (r === "SUPER") return TEMA_MENSAJES;
