@@ -41,6 +41,9 @@ interface Props {
   onConfirm: (file: File) => void | Promise<void>;
   onCancel: () => void;
   defaultAspect?: AspectKey;
+  lockAspect?: boolean;
+  exportMime?: string;
+  dpiGuide?: boolean;
 }
 
 export default function ImageEditorModal({
@@ -48,8 +51,13 @@ export default function ImageEditorModal({
   onConfirm,
   onCancel,
   defaultAspect = "85:54",
+  lockAspect = false,
+  exportMime,
+  dpiGuide = false,
 }: Props) {
   const isOpen = !!file;
+  const aspectLocked = lockAspect || dpiGuide;
+  const aspectDefault = dpiGuide ? "85:54" : defaultAspect;
 
   const objectUrl = useMemo(
     () => (file ? URL.createObjectURL(file) : null),
@@ -75,10 +83,10 @@ export default function ImageEditorModal({
       setCrop({ x: 0, y: 0 });
       setZoom(1);
       setRotation(0);
-      setAspectKey(defaultAspect);
+      setAspectKey(aspectDefault);
       setCroppedAreaPixels(null);
     }
-  }, [isOpen, defaultAspect]);
+  }, [isOpen, aspectDefault]);
 
   const aspect = ASPECT_OPTIONS.find((o) => o.key === aspectKey)?.value;
 
@@ -106,7 +114,12 @@ export default function ImageEditorModal({
     }
     setIsProcessing(true);
     try {
-      const cropped = await getCroppedFile(file, croppedAreaPixels, rotation);
+      const cropped = await getCroppedFile(
+        file,
+        croppedAreaPixels,
+        rotation,
+        exportMime,
+      );
       await onConfirm(cropped);
     } catch (e: unknown) {
       const message =
@@ -150,7 +163,7 @@ export default function ImageEditorModal({
             <DialogPanel className="relative w-full max-w-3xl bg-white dark:bg-neutral-900 text-gray-900 dark:text-gray-100 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[95dvh] border border-gray-200 dark:border-neutral-800">
               <div className="sticky top-0 z-20 shrink-0 flex items-center justify-between px-4 sm:px-5 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 sm:py-3 border-b border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-950">
                 <h3 className="text-sm font-black uppercase text-gray-800 dark:text-gray-100">
-                  Editar imagen
+                  {dpiGuide ? "Alinear DPI" : "Editar imagen"}
                 </h3>
                 <button
                   type="button"
@@ -162,7 +175,13 @@ export default function ImageEditorModal({
                 </button>
               </div>
 
-              <div className="relative bg-black h-[50vh] sm:h-[55vh] min-h-[280px] sm:min-h-[320px]">
+              <div
+                className={`relative h-[50vh] sm:h-[55vh] min-h-[280px] sm:min-h-[320px] ${
+                  exportMime === "image/png"
+                    ? "bg-[length:16px_16px] bg-[linear-gradient(45deg,#d4d4d4_25%,transparent_25%),linear-gradient(-45deg,#d4d4d4_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#d4d4d4_75%),linear-gradient(-45deg,transparent_75%,#d4d4d4_75%)] bg-[position:0_0,0_8px,8px_-8px,-8px_0] bg-white"
+                    : "bg-black"
+                }`}
+              >
                 {objectUrl && (
                   <Cropper
                     image={objectUrl}
@@ -177,12 +196,58 @@ export default function ImageEditorModal({
                     onRotationChange={setRotation}
                     onCropComplete={handleCropComplete}
                     restrictPosition={false}
-                    showGrid
+                    showGrid={!dpiGuide}
+                    classes={
+                      dpiGuide
+                        ? { cropAreaClassName: "dpi-cara-guide" }
+                        : undefined
+                    }
                   />
+                )}
+                {dpiGuide && (
+                  <style>{`
+                    .dpi-cara-guide::before {
+                      content: "Cara";
+                      position: absolute;
+                      left: 71%;
+                      top: 38%;
+                      transform: translateY(-100%);
+                      background: #fbbf24;
+                      color: #000;
+                      font-size: 9px;
+                      font-weight: 900;
+                      text-transform: uppercase;
+                      letter-spacing: 0.04em;
+                      padding: 2px 6px;
+                      border-radius: 2px 2px 0 0;
+                      z-index: 3;
+                      line-height: 1.2;
+                    }
+                    .dpi-cara-guide::after {
+                      content: "";
+                      position: absolute;
+                      left: 71%;
+                      top: 38%;
+                      width: 25%;
+                      aspect-ratio: 3 / 4;
+                      border: 2.5px dashed #fbbf24;
+                      border-radius: 2px;
+                      box-sizing: border-box;
+                      pointer-events: none;
+                      z-index: 3;
+                    }
+                  `}</style>
                 )}
               </div>
 
+              {dpiGuide && (
+                <p className="shrink-0 border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-[11px] font-bold text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-200 sm:px-5">
+                  Recorta el DPI completo. La cara va en el recuadro amarillo (3:4).
+                </p>
+              )}
+
               <div className="px-4 sm:px-5 py-3 border-t border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-950 flex flex-col gap-3 shrink-0">
+                {!aspectLocked && (
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-[10px] font-black uppercase text-gray-500 dark:text-neutral-400">
                     Aspecto
@@ -203,6 +268,7 @@ export default function ImageEditorModal({
                     </button>
                   ))}
                 </div>
+                )}
 
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                   <div className="flex items-center gap-2 flex-1">

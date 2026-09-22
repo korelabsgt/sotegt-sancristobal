@@ -1,10 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogPanel } from "@headlessui/react";
 import { Download, Printer, X } from "lucide-react";
 import { toast } from "@/lib/toast";
+import { createClient } from "@/utils/supabase/client";
+import { obtenerConfiguracionAction } from "@/components/dashboard/actions/configuracion";
 import type { Afiliado } from "./esquemas";
 import { formatearDpi } from "./contacto";
 import {
@@ -20,8 +23,13 @@ interface Props {
 
 const CARNET_WIDTH_MM = 85.6;
 const CARNET_HEIGHT_MM = 53.98;
-const LOGO_SEDE_URL = "/images/logosede.png";
-const LOGO_FALLBACK_URL = "/images/logo.png";
+const CARNET_DISPLAY_PX = 400;
+const BUCKET_SETTINGS = "settings";
+const BUCKET_DPIS = "dpis";
+const DPI_FOTO_LEFT = 0.71;
+const DPI_FOTO_TOP = 0.38;
+const DPI_FOTO_W = 0.25;
+const DPI_FOTO_H = 0.25 * (4 / 3) * (85.6 / 53.98);
 
 function slugNombreArchivo(nombre: string) {
   return (
@@ -40,6 +48,12 @@ function etiquetaGenero(sexo: string | null | undefined): string {
   return sexo || "—";
 }
 
+const VALOR_PRIMARY = "#1898A1";
+const VALOR_DARK = "#0f6369";
+const VALOR_MID = "#147880";
+const VALOR_LIGHT = "#22a8b0";
+const VALOR_ACCENT = "#1a7a82";
+
 function OndaCarnet({ className = "" }: { className?: string }) {
   return (
     <svg
@@ -51,36 +65,36 @@ function OndaCarnet({ className = "" }: { className?: string }) {
       <rect width="856" height="540" fill="#ffffff" />
       <path
         d="M0 455 C160 435 260 480 400 458 C520 440 620 425 856 412 L856 540 L0 540 Z"
-        fill="#1d4ed8"
+        fill={VALOR_PRIMARY}
       />
       <path
         d="M0 468 C150 450 250 490 390 472 C520 455 630 442 856 430"
         fill="none"
-        stroke="#1e3a8a"
+        stroke={VALOR_DARK}
         strokeWidth="3"
         opacity="0.4"
       />
       <path
         d="M0 480 C140 462 240 498 380 484 C520 470 640 458 856 448"
         fill="none"
-        stroke="#1e40af"
+        stroke={VALOR_MID}
         strokeWidth="2.5"
         opacity="0.35"
       />
       <path
         d="M0 450 C160 430 260 475 400 453 C520 435 620 420 856 407"
         fill="none"
-        stroke="#2563eb"
+        stroke={VALOR_LIGHT}
         strokeWidth="4"
         opacity="0.55"
       />
       <path
         d="M400 458 C520 440 620 425 856 412 L856 540 L480 540 C440 520 410 490 400 458 Z"
-        fill="#1e3a8a"
+        fill={VALOR_DARK}
       />
       <path
         d="M460 462 C560 440 680 425 856 418 L856 540 L510 540 C475 515 450 485 460 462 Z"
-        fill="#1d4ed8"
+        fill={VALOR_ACCENT}
         opacity="0.95"
       />
     </svg>
@@ -89,17 +103,65 @@ function OndaCarnet({ className = "" }: { className?: string }) {
 
 export default function CarnetAfiliacion({ afiliado, open, onClose }: Props) {
   const [generando, setGenerando] = useState(false);
-  const [logoSrc, setLogoSrc] = useState(LOGO_SEDE_URL);
+  const [partidoSrc, setPartidoSrc] = useState<string | null>(null);
+  const [fotoDpiSrc, setFotoDpiSrc] = useState<string | null>(null);
+  const [escalaVista, setEscalaVista] = useState(1);
   const carnetRef = useRef<HTMLDivElement>(null);
+
+  const { data: config } = useQuery({
+    queryKey: ["config_sistema"],
+    queryFn: () => obtenerConfiguracionAction(),
+    enabled: open,
+    staleTime: 60_000,
+  });
+
+  useEffect(() => {
+    if (!open) return;
+    const actualizar = () => {
+      const margen = 8;
+      const maxW = Math.max(120, window.innerWidth - margen);
+      setEscalaVista(Math.min(1, maxW / CARNET_DISPLAY_PX));
+    };
+    actualizar();
+    window.addEventListener("resize", actualizar);
+    return () => window.removeEventListener("resize", actualizar);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelado = false;
+    const supabase = createClient();
+    const firmar = async (
+      bucket: string,
+      path: string | null | undefined,
+    ) => {
+      if (!path) return null;
+      const { data } = await supabase.storage
+        .from(bucket)
+        .createSignedUrl(path, 60 * 60);
+      return data?.signedUrl ?? null;
+    };
+    void (async () => {
+      const [partido, foto] = await Promise.all([
+        firmar(BUCKET_SETTINGS, config?.partido_url),
+        firmar(BUCKET_DPIS, afiliado?.dpi_frontal_url),
+      ]);
+      if (cancelado) return;
+      setPartidoSrc(partido);
+      setFotoDpiSrc(foto);
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [open, config?.partido_url, afiliado?.dpi_frontal_url]);
 
   if (!afiliado) return null;
 
   const nombreCompleto = `${afiliado.nombres} ${afiliado.apellidos}`.trim();
   const palabrasNombre = nombreCompleto.split(/\s+/).filter(Boolean).length;
   const claseNombre =
-    palabrasNombre > 4
-      ? "text-[11px] md:text-xs"
-      : "text-sm md:text-base";
+    palabrasNombre > 4 ? "text-[11px]" : "text-base";
+  const altoCarnetPx = CARNET_DISPLAY_PX * (CARNET_HEIGHT_MM / CARNET_WIDTH_MM);
   const dpi = afiliado.dpi || "—";
   const dpiMostrar = dpi === "—" ? "—" : formatearDpi(dpi);
   const padron =
@@ -111,6 +173,7 @@ export default function CarnetAfiliacion({ afiliado, open, onClose }: Props) {
   const mismoDpiPadron =
     !!dpiNorm && !!padronNorm && dpiNorm === padronNorm;
   const lugar = afiliado.lugar_nombre || "—";
+  const nombreCandidato = (config?.nombre_candidato || "").trim();
   const genero = etiquetaGenero(afiliado.sexo);
   const fechaNac = formatearFechaNacimiento(afiliado.nacimiento);
   const edad = etiquetaEdadNacimiento(afiliado.nacimiento);
@@ -139,8 +202,7 @@ export default function CarnetAfiliacion({ afiliado, open, onClose }: Props) {
 
     await esperarImagenes(nodo);
 
-    const rect = nodo.getBoundingClientRect();
-    const ancho = Math.max(Math.round(rect.width), 320);
+    const ancho = CARNET_DISPLAY_PX;
     const alto = Math.round(ancho * (CARNET_HEIGHT_MM / CARNET_WIDTH_MM));
 
     const host = document.createElement("div");
@@ -159,7 +221,11 @@ export default function CarnetAfiliacion({ afiliado, open, onClose }: Props) {
     clone.style.height = `${alto}px`;
     clone.style.maxWidth = "none";
     clone.style.transform = "none";
+    clone.style.transformOrigin = "top left";
     clone.style.margin = "0";
+    clone.style.position = "relative";
+    clone.style.left = "0";
+    clone.style.top = "0";
     host.appendChild(clone);
     document.body.appendChild(host);
 
@@ -332,10 +398,10 @@ export default function CarnetAfiliacion({ afiliado, open, onClose }: Props) {
 
   return (
     <Dialog open={open} onClose={onClose} className="relative z-[60]">
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" aria-hidden="true" />
-      <div className="fixed inset-0 flex items-center justify-center p-4">
-        <DialogPanel className="w-full max-w-lg overflow-hidden rounded-xl border bg-white shadow-2xl dark:border-neutral-800 dark:bg-neutral-900">
-          <div className="flex items-center justify-between border-b px-4 py-3 dark:border-neutral-800">
+      <div className="fixed inset-0 bg-black/80" aria-hidden="true" />
+      <div className="fixed inset-0 flex items-stretch justify-stretch p-0">
+        <DialogPanel className="flex h-full w-full max-w-none flex-col overflow-hidden rounded-none border-0 bg-white shadow-none dark:bg-neutral-900">
+          <div className="flex shrink-0 items-center justify-between border-b px-4 py-3 dark:border-neutral-800">
             <h3 className="text-sm font-bold uppercase text-gray-900 dark:text-gray-100">
               Carnet de Afiliación
             </h3>
@@ -350,131 +416,146 @@ export default function CarnetAfiliacion({ afiliado, open, onClose }: Props) {
             </Button>
           </div>
 
-          <div className="flex flex-col items-center gap-5 bg-white p-4 md:p-6 dark:bg-neutral-900">
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 bg-neutral-100 p-0 dark:bg-neutral-950">
             <div
-              ref={carnetRef}
-              className="relative w-full max-w-[400px] overflow-hidden rounded-none border-[1.5px] border-[#1d4ed8] bg-white"
+              className="relative shrink-0"
               style={{
-                aspectRatio: "85.6 / 53.98",
-                fontFamily: "Arial, Helvetica, sans-serif",
+                width: CARNET_DISPLAY_PX * escalaVista,
+                height: altoCarnetPx * escalaVista,
               }}
             >
-              <OndaCarnet className="absolute inset-0 h-full w-full" />
+              <div
+                ref={carnetRef}
+                className="absolute left-0 top-0 overflow-hidden rounded-none border-[1.5px] border-[#1898A1] bg-white"
+                style={{
+                  width: CARNET_DISPLAY_PX,
+                  height: altoCarnetPx,
+                  fontFamily: "Arial, Helvetica, sans-serif",
+                  transform: `scale(${escalaVista})`,
+                  transformOrigin: "top left",
+                }}
+              >
+                <OndaCarnet className="absolute inset-0 h-full w-full" />
 
-              <div className="relative z-10 h-[72%] px-3.5 pt-2">
-                {/* Logo esquina superior derecha, encima del texto */}
-                <img
-                  src={logoSrc}
-                  alt="CABAL"
-                  crossOrigin="anonymous"
-                  className="pointer-events-none absolute right-2 top-1 z-20 h-[5rem] w-auto object-contain drop-shadow-sm md:h-[5.5rem]"
-                  draggable={false}
-                  onError={() => {
-                    if (logoSrc !== LOGO_FALLBACK_URL) {
-                      setLogoSrc(LOGO_FALLBACK_URL);
-                    }
-                  }}
-                />
+                <div className="relative z-10 h-[72%] px-3.5 pt-2">
+                  {partidoSrc && (
+                    <img
+                      src={partidoSrc}
+                      alt="Valor"
+                      crossOrigin="anonymous"
+                      className="pointer-events-none absolute right-4 top-0.5 z-20 h-[5.75rem] w-[6.25rem] object-contain object-bottom"
+                      draggable={false}
+                    />
+                  )}
+                  {fotoDpiSrc && (
+                    <div className="pointer-events-none absolute right-5 top-[6.35rem] z-20 aspect-[3/4] w-[5.25rem] overflow-hidden rounded-md border-[1.5px] border-[#1898A1]">
+                      <img
+                        src={fotoDpiSrc}
+                        alt=""
+                        crossOrigin="anonymous"
+                        className="absolute max-w-none"
+                        draggable={false}
+                        style={{
+                          left: `${(-DPI_FOTO_LEFT / DPI_FOTO_W) * 100}%`,
+                          top: `${(-DPI_FOTO_TOP / DPI_FOTO_H) * 100}%`,
+                          width: `${(1 / DPI_FOTO_W) * 100}%`,
+                          height: `${(1 / DPI_FOTO_H) * 100}%`,
+                        }}
+                      />
+                    </div>
+                  )}
 
-                <p
-                  className={`relative z-10 w-full whitespace-nowrap pr-16 font-black uppercase leading-none tracking-tight text-gray-900 md:pr-20 ${claseNombre}`}
-                >
-                  {nombreCompleto}
-                </p>
-
-                <div className="mt-3.5 pr-4">
-                  <div
-                    className={`border-b border-slate-200 pb-2 ${
-                      mismoDpiPadron
-                        ? ""
-                        : "grid grid-cols-2 gap-x-4"
-                    }`}
+                  <p
+                    className={`relative z-10 w-full whitespace-nowrap font-black uppercase leading-none tracking-tight text-[#565659] ${
+                      partidoSrc || fotoDpiSrc ? "pr-32" : ""
+                    } ${claseNombre}`}
                   >
-                    {mismoDpiPadron ? (
+                    {nombreCompleto}
+                  </p>
+
+                  <div
+                    className={`mt-2.5 ${partidoSrc || fotoDpiSrc ? "pr-32" : ""}`}
+                  >
+                    <div className="border-b border-slate-200 pb-1.5">
+                      <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400">
+                        {mismoDpiPadron ? "DPI y Padrón" : "DPI"}
+                      </p>
+                      <p className="mt-0.5 font-mono text-sm font-bold leading-none text-[#565659]">
+                        {dpiMostrar}
+                      </p>
+                      {!mismoDpiPadron && (
+                        <p className="mt-1 truncate font-mono text-[10px] font-bold leading-none tracking-tight text-[#565659]">
+                          <span className="mr-1.5 text-[7px] font-bold uppercase tracking-wider text-slate-400">
+                            Padrón
+                          </span>
+                          {padron}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-x-3 border-b border-slate-200 py-2">
                       <div>
                         <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400">
-                          DPI y Padrón
+                          Género
                         </p>
-                        <p className="mt-0.5 font-mono text-xs font-bold text-gray-900 md:text-sm">
-                          {dpiMostrar}
+                        <p className="mt-0.5 text-sm font-bold text-[#565659]">
+                          {genero}
                         </p>
                       </div>
-                    ) : (
-                      <>
-                        <div>
-                          <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400">
-                            DPI
-                          </p>
-                          <p className="mt-0.5 font-mono text-xs font-bold text-gray-900 md:text-sm">
-                            {dpiMostrar}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400">
-                            Padrón
-                          </p>
-                          <p className="mt-0.5 font-mono text-xs font-bold text-gray-900 md:text-sm">
-                            {padron}
-                          </p>
-                        </div>
-                      </>
-                    )}
-                  </div>
+                      <div>
+                        <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400">
+                          Nacimiento
+                        </p>
+                        <p className="mt-0.5 text-sm font-bold text-[#565659]">
+                          {fechaNac}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400">
+                          Edad
+                        </p>
+                        <p className="mt-0.5 text-sm font-bold text-[#565659]">
+                          {edad}
+                        </p>
+                      </div>
+                    </div>
 
-                  <div className="grid grid-cols-3 gap-x-3 border-b border-slate-200 py-2">
-                    <div>
+                    <div className="pt-2">
                       <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400">
-                        Género
+                        Lugar
                       </p>
-                      <p className="mt-0.5 text-xs font-bold text-gray-900 md:text-sm">
-                        {genero}
+                      <p className="mt-0.5 text-sm font-bold text-[#565659]">
+                        {lugar}
                       </p>
                     </div>
-                    <div>
-                      <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400">
-                        Nacimiento
-                      </p>
-                      <p className="mt-0.5 text-xs font-bold text-gray-900 md:text-sm">
-                        {fechaNac}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400">
-                        Edad
-                      </p>
-                      <p className="mt-0.5 text-xs font-bold text-gray-900 md:text-sm">
-                        {edad}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="pt-2">
-                    <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400">
-                      Lugar
-                    </p>
-                    <p className="mt-0.5 text-xs font-bold text-gray-900 md:text-sm">
-                      {lugar}
-                    </p>
                   </div>
                 </div>
-              </div>
 
-              <div className="absolute bottom-1 right-3 z-20 text-right md:bottom-1.5 md:right-3.5">
-                <p className="text-xs font-black uppercase leading-tight tracking-wide text-white md:text-sm">
-                  Carnet de
-                  <br />
-                  Afiliación
-                </p>
+                <div className="absolute bottom-1 left-3 right-3 z-20 flex items-end justify-between gap-2">
+                  {nombreCandidato && (
+                    <div className="min-w-0 leading-none">
+                      <p className="truncate text-[11px] font-black uppercase leading-none tracking-tight text-white">
+                        {nombreCandidato}
+                      </p>
+                      <p className="mt-px truncate text-[8px] font-bold uppercase leading-none tracking-wider text-[#c5d0d2]">
+                        Coordinador Municipal
+                      </p>
+                    </div>
+                  )}
+                  <p className="mb-0.5 ml-auto shrink-0 whitespace-nowrap text-[11px] font-black uppercase leading-none tracking-wide text-white">
+                    Carnet de afiliación
+                  </p>
+                </div>
               </div>
             </div>
 
-            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            <div className="flex w-full max-w-[400px] flex-row justify-center gap-2 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
               <Button
                 type="button"
                 variant="outline"
                 onClick={imprimir}
                 disabled={generando}
-                className="hidden w-full border-blue-300 text-blue-800 hover:bg-blue-50 sm:inline-flex sm:w-auto"
+                className="hidden border-blue-300 bg-white text-blue-800 hover:bg-blue-50 dark:border-blue-300 dark:bg-white dark:text-blue-800 dark:hover:bg-blue-50 sm:inline-flex"
               >
                 <Printer className="mr-2 h-4 w-4" />
                 {generando ? "Preparando..." : "Imprimir"}
@@ -483,7 +564,7 @@ export default function CarnetAfiliacion({ afiliado, open, onClose }: Props) {
                 type="button"
                 onClick={descargarImagen}
                 disabled={generando}
-                className="w-full bg-blue-700 hover:bg-blue-800 sm:w-auto"
+                className="bg-blue-700 hover:bg-blue-800"
               >
                 <Download className="mr-2 h-4 w-4" />
                 {generando ? "Generando..." : "Descargar imagen"}

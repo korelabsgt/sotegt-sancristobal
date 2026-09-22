@@ -38,6 +38,7 @@ interface SignupFormProps {
   rolSesion?: string;
   modoCrearSede?: boolean;
   rolInicial?: "LIDER" | "COORDINADOR" | "EMPLEADO" | "ADMIN" | "SUPER" | null;
+  coordinadorId?: string | null;
 }
 
 type AcentoVisual = {
@@ -121,6 +122,7 @@ export function SignupForm({
   rolSesion,
   modoCrearSede = false,
   rolInicial = null,
+  coordinadorId = null,
 }: SignupFormProps) {
   const router = useRouter();
   const isEdit = !!initialData;
@@ -340,6 +342,7 @@ export function SignupForm({
     if (isEdit) {
       formData.set("id", String(initialData.user_id || initialData.id || ""));
     }
+    if (coordinadorId) formData.set("coordinador_id", coordinadorId);
 
     let result;
     if (isEdit) {

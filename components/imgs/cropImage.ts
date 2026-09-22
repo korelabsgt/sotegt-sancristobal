@@ -26,6 +26,7 @@ export const getCroppedFile = async (
   file: File,
   pixelCrop: PixelCrop,
   rotation: number,
+  forceType?: string,
 ): Promise<File> => {
   const objectUrl = URL.createObjectURL(file);
   try {
@@ -68,9 +69,10 @@ export const getCroppedFile = async (
     );
 
     const outputType =
-      file.type === "image/png" || file.type === "image/webp"
+      forceType ||
+      (file.type === "image/png" || file.type === "image/webp"
         ? file.type
-        : "image/jpeg";
+        : "image/jpeg");
 
     const blob = await new Promise<Blob>((resolve, reject) => {
       croppedCanvas.toBlob(

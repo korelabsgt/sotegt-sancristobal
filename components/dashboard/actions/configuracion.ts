@@ -132,3 +132,38 @@ export async function actualizarConfiguracionSuperAction(
 
   return guardarConfiguracion({ padron, hay_sede, hay_empleados });
 }
+
+export async function actualizarImagenConfigAction(
+  campo: "logo_url" | "partido_url",
+  path: string | null,
+) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("No autenticado");
+  }
+
+  const { data: perfil } = await supabase
+    .from("info_perfil")
+    .select("roles(nombre)")
+    .eq("user_id", user.id)
+    .single();
+
+  const roles = perfil?.roles as
+    | { nombre?: string | null }
+    | { nombre?: string | null }[]
+    | null
+    | undefined;
+  const rol = Array.isArray(roles)
+    ? (roles[0]?.nombre || "").toUpperCase()
+    : (roles?.nombre || "").toUpperCase();
+
+  if (rol !== "SUPER") {
+    throw new Error("Solo el rol SUPER puede modificar esta configuración");
+  }
+
+  return guardarConfiguracion({ [campo]: path });
+}

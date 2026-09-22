@@ -175,6 +175,7 @@ interface Props {
   signedUrlExpiresIn?: number;
   enableImageLoupe?: boolean;
   label?: string;
+  dpiGuide?: boolean;
 }
 
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
@@ -193,6 +194,7 @@ export default function ImageUploader({
   signedUrlExpiresIn = 60 * 60,
   enableImageLoupe = false,
   label,
+  dpiGuide = false,
 }: Props) {
   const supabase = useMemo(() => createClient(), []);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -437,6 +439,9 @@ export default function ImageUploader({
         file={editingFile}
         onConfirm={uploadEditedFile}
         onCancel={() => setEditingFile(null)}
+        dpiGuide={dpiGuide}
+        defaultAspect={dpiGuide ? "85:54" : "85:54"}
+        lockAspect={dpiGuide}
       />
     </div>
   );

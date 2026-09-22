@@ -186,6 +186,7 @@ export default function GestionDpiModal({
                         bucketName={BUCKET}
                         currentImagePath={frontalPath}
                         enableImageLoupe
+                        dpiGuide
                         onUploadSuccess={async (newPath) => {
                           await mutation.mutateAsync({
                             campo: "dpi_frontal_url",

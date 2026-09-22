@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { TemaLista } from "./temaPestana";
 import { TEMA_LIDERES, temaDesdeLider } from "./temaPestana";
-import { esUsuarioSede } from "./esquemas";
+import { esRolCoordinador, esUsuarioSede } from "./esquemas";
 import { metasPorRol } from "@/lib/metasAfiliacion";
 
 export interface Lider {
@@ -95,7 +95,10 @@ export default function Lideres({
     rolUpper === "ADMIN";
   const esSedeSesion = rolUpper === "SEDE";
   const puedeGestionarUsuarios =
-    esAdminOSuper || rolUpper === "DOCUMENTADOR" || esSedeSesion;
+    esAdminOSuper ||
+    rolUpper === "DOCUMENTADOR" ||
+    esSedeSesion ||
+    esRolCoordinador(rolUpper);
 
   const { data: config } = useQuery({
     queryKey: ["config_sistema"],

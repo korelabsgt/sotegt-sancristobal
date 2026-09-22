@@ -39,6 +39,7 @@ import {
   actualizarConfiguracionSuperAction,
   obtenerConfiguracionAction,
 } from "./actions/configuracion";
+import LogoPngField from "./LogoPngField";
 
 interface Props {
   showMetas?: boolean;
@@ -51,9 +52,11 @@ function requerimientoMeta(
   metaLider: number,
   metaCoordinador: number,
 ) {
-  const enlaces = metaLider > 0 ? Math.ceil(objetivo / metaLider) : 0;
+  const roles = (metaLider > 0 ? 1 : 0) + (metaCoordinador > 0 ? 1 : 0);
+  const parte = roles > 0 ? objetivo / roles : 0;
+  const enlaces = metaLider > 0 ? Math.ceil(parte / metaLider) : 0;
   const coordinadores =
-    metaCoordinador > 0 ? Math.ceil(objetivo / metaCoordinador) : 0;
+    metaCoordinador > 0 ? Math.ceil(parte / metaCoordinador) : 0;
   return { enlaces, coordinadores, total: enlaces + coordinadores };
 }
 
@@ -88,6 +91,8 @@ export default function ConfiguracionSistema({
   const [padronPrecargado, setPadronPrecargado] = useState(false);
   const [haySede, setHaySede] = useState(true);
   const [hayEmpleados, setHayEmpleados] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [partidoUrl, setPartidoUrl] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<
     "candidato" | "metas" | "lugares" | "super"
   >("candidato");
@@ -107,6 +112,8 @@ export default function ConfiguracionSistema({
     setPadronPrecargado(config.padron ?? false);
     setHaySede(config.hay_sede ?? true);
     setHayEmpleados(config.hay_empleados ?? false);
+    setLogoUrl(config.logo_url ?? null);
+    setPartidoUrl(config.partido_url ?? null);
     setInitialized(true);
   }
 
@@ -829,6 +836,21 @@ export default function ConfiguracionSistema({
                     }`}
                   />
                 </button>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <LogoPngField
+                  campo="logo_url"
+                  titulo="Logo"
+                  path={logoUrl}
+                  onChange={setLogoUrl}
+                />
+                <LogoPngField
+                  campo="partido_url"
+                  titulo="Partido"
+                  path={partidoUrl}
+                  onChange={setPartidoUrl}
+                />
               </div>
 
               <div className="flex items-center justify-between p-4 bg-white dark:bg-neutral-900 rounded-xl border-2 border-violet-200 dark:border-violet-700">

@@ -14,6 +14,11 @@ export async function GET() {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
 
+  const selectPerfiles =
+    "user_id, nombres, apellidos, activo, rol_id, coordinador_id, roles!inner ( id, nombre )";
+  const selectPerfilesBase =
+    "user_id, nombres, apellidos, activo, rol_id, roles!inner ( id, nombre )";
+
   const [profileRes, perfilesRes, conteoRes, lugaresRes, sectoresRes] =
     await Promise.all([
       supabase
@@ -24,9 +29,7 @@ export async function GET() {
 
       supabase
         .from("info_perfil")
-        .select(
-          "user_id, nombres, apellidos, activo, rol_id, roles!inner ( id, nombre )",
-        )
+        .select(selectPerfiles)
         .order("nombres", { ascending: true }),
 
       supabase
@@ -55,7 +58,22 @@ export async function GET() {
     rol_id: profileRes.data?.rol_id || null,
   };
 
-  const perfiles = perfilesRes.data || [];
+  const rolSesion = (sessionData.rol || "").toUpperCase().trim();
+  const esCoordinadorSesion =
+    rolSesion === "COORDINADOR" || rolSesion === "COORDINADORES";
+  const perfilesConsulta = perfilesRes.error
+    ? await supabase
+        .from("info_perfil")
+        .select(selectPerfilesBase)
+        .order("nombres", { ascending: true })
+    : perfilesRes;
+  const perfilesTodos = perfilesConsulta.data || [];
+  const perfiles = esCoordinadorSesion
+    ? perfilesTodos.filter(
+        (p: { user_id: string; coordinador_id?: string | null }) =>
+          p.user_id === user.id || p.coordinador_id === user.id,
+      )
+    : perfilesTodos;
   const conteoRaw = conteoRes.data || [];
   const sectores = sectoresRes.data || [];
   const sectorMap = new Map(sectores.map((s) => [s.id, s.nombre]));
@@ -92,6 +110,7 @@ export async function GET() {
     activo: p.activo,
     rol: p.roles?.nombre,
     rol_id: p.rol_id,
+    coordinador_id: p.coordinador_id ?? null,
     conteoAfiliados: conteoMap.get(p.user_id)?.total || 0,
     conteoTitulares: conteoMap.get(p.user_id)?.titulares || 0,
     conteoFamiliares: conteoMap.get(p.user_id)?.familiares || 0,

@@ -122,6 +122,25 @@ export const updateUsuarioAction = async (formData: FormData) => {
 
   const rolSesion = await obtenerRolSesionNombre(supabase, user.id);
   const rolObjetivo = await obtenerNombreRolPorId(parseInt(rol_id, 10));
+  const esCoordinadorSesion =
+    rolSesion === "COORDINADOR" || rolSesion === "COORDINADORES";
+
+  if (esCoordinadorSesion) {
+    const { data: perfilObjetivo } = await supabaseAdmin
+      .from("info_perfil")
+      .select("coordinador_id, roles(nombre)")
+      .eq("user_id", id)
+      .maybeSingle();
+    const coordinadorId = (
+      perfilObjetivo as { coordinador_id?: string | null } | null
+    )?.coordinador_id;
+    if (
+      coordinadorId !== user.id ||
+      (rolObjetivo !== "LIDER" && rolObjetivo !== "LÍDER")
+    ) {
+      return { error: "Solo puedes editar los enlaces que creaste." };
+    }
+  }
 
   if (rolSesion === "SEDE") {
     const { data: perfilActual } = await supabaseAdmin
@@ -215,10 +234,43 @@ export const signUpAction = async (formData: FormData) => {
   const rolSesion = await obtenerRolSesionNombre(supabase, sesion.id);
   const rolObjetivo = await obtenerNombreRolPorId(parseInt(rol_id, 10));
 
+  const esCoordinadorSesion =
+    rolSesion === "COORDINADOR" || rolSesion === "COORDINADORES";
+  const esEnlace = rolObjetivo === "LIDER" || rolObjetivo === "LÍDER";
+
   if (rolSesion === "SEDE" && !esRolLiderOEmpleadoNombre(rolObjetivo)) {
     return {
       error: "El usuario Sede solo puede crear enlaces y empleados.",
     };
+  }
+
+  if (esCoordinadorSesion && !esEnlace) {
+    return { error: "El coordinador solo puede crear enlaces." };
+  }
+
+  const coordinadorForzado =
+    formData.get("coordinador_id")?.toString().trim() || "";
+  let coordinadorAsignado: string | null =
+    esCoordinadorSesion && esEnlace ? sesion.id : null;
+  if (rolSesion === "SUPER" && esEnlace && coordinadorForzado) {
+    const { data: perfilCoord } = await supabaseAdmin
+      .from("info_perfil")
+      .select("roles(nombre)")
+      .eq("user_id", coordinadorForzado)
+      .maybeSingle();
+    const rolesCoord = perfilCoord?.roles as
+      | { nombre?: string }
+      | { nombre?: string }[]
+      | null;
+    const nombreCoord = (
+      (Array.isArray(rolesCoord) ? rolesCoord[0]?.nombre : rolesCoord?.nombre) ||
+      ""
+    )
+      .toUpperCase()
+      .trim();
+    if (nombreCoord === "COORDINADOR" || nombreCoord === "COORDINADORES") {
+      coordinadorAsignado = coordinadorForzado;
+    }
   }
 
   const { data, error } = await supabaseAdmin.auth.admin.createUser({
@@ -241,13 +293,27 @@ export const signUpAction = async (formData: FormData) => {
 
   const user_id = data.user.id;
 
-  const { error: errorPerfil } = await supabase.from("info_perfil").insert({
+  const perfilNuevo: {
+    user_id: string;
+    nombres: string;
+    apellidos: string;
+    activo: boolean;
+    rol_id: number;
+    coordinador_id?: string;
+  } = {
     user_id,
     nombres,
     apellidos,
     activo: true,
     rol_id: parseInt(rol_id, 10),
-  });
+  };
+  if (coordinadorAsignado) {
+    perfilNuevo.coordinador_id = coordinadorAsignado;
+  }
+
+  const { error: errorPerfil } = await supabaseAdmin
+    .from("info_perfil")
+    .insert(perfilNuevo);
 
   if (errorPerfil) {
     console.error("Error al insertar en info_perfil:", errorPerfil);

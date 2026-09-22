@@ -1,14 +1,22 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "@/lib/toast";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   BarChart3,
   Building2,
+  Check,
   FileBarChart,
   Pencil,
   Trash2,
+  UserCog,
   UsersRound,
   X,
 } from "lucide-react";
@@ -178,6 +186,15 @@ const tabPillClass = (active: boolean, tab: Tab) => {
 
 const tabIconClass = () => "shrink-0 flex items-center justify-center";
 
+const ROLES_SIMULACION = [
+  { id: "SUPER", label: "Super" },
+  { id: "ADMIN", label: "Admin" },
+  { id: "SEDE", label: "Sede" },
+  { id: "COORDINADOR", label: "Coordinador" },
+  { id: "LIDER", label: "Enlace" },
+  { id: "EMPLEADO", label: "Empleado" },
+] as const;
+
 const tabBadgeClass = () =>
   "inline-flex items-center justify-center min-w-[1.25rem] md:min-w-[1.5rem] font-bold leading-none shrink-0 tabular-nums";
 
@@ -213,6 +230,10 @@ export default function Ver() {
   const [isFirstMemberAddition, setIsFirstMemberAddition] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [liderSimulado, setLiderSimulado] = useState<Lider | null>(null);
+  const [rolSimulado, setRolSimulado] = useState<string | null>(null);
+  const [vistaCoordinador, setVistaCoordinador] = useState<
+    "celula" | "enlaces"
+  >("celula");
 
   const { data: dashboardData, isPending: isDashboardPending } = useQuery({
     queryKey: ["dashboard-data"],
@@ -230,8 +251,35 @@ export default function Ver() {
   const isDashboardLoading = isDashboardPending && !dashboardData;
 
   const session = dashboardData?.session;
-  const rol = session?.rol || "";
-  const userId = session?.id || "";
+  const esSuperReal = (session?.rol || "").toUpperCase() === "SUPER";
+  const simulando = esSuperReal && !!rolSimulado && rolSimulado !== "SUPER";
+  const usuariosCrudos = (dashboardData?.usuarios || []) as Lider[];
+  const usuarioDeRol = (objetivo: string) => {
+    if (objetivo === "SEDE") return usuariosCrudos.find((u) => esUsuarioSede(u));
+    if (objetivo === "LIDER") {
+      return usuariosCrudos.find((u) => {
+        const r = (u.rol || "").toUpperCase();
+        return (r === "LIDER" || r === "LÍDER") && !esUsuarioSede(u);
+      });
+    }
+    if (objetivo === "COORDINADOR") {
+      return usuariosCrudos.find((u) => esRolCoordinador(u.rol));
+    }
+    if (objetivo === "EMPLEADO") {
+      return usuariosCrudos.find((u) => esRolEmpleado(u.rol));
+    }
+    if (objetivo === "ADMIN") {
+      return usuariosCrudos.find((u) => {
+        const r = (u.rol || "").toUpperCase();
+        return r === "ADMIN" || r === "ADMINISTRADOR";
+      });
+    }
+    return undefined;
+  };
+  const usuarioSimulado = simulando ? usuarioDeRol(rolSimulado || "") : undefined;
+  const rol = simulando ? rolSimulado || "" : session?.rol || "";
+  const userId =
+    simulando && usuarioSimulado ? usuarioSimulado.id : session?.id || "";
   const rolUpper = (rol || "").toUpperCase();
 
   const puedeVerBotonNuevo =
@@ -239,7 +287,7 @@ export default function Ver() {
     rolUpper === "ADMINISTRADOR" ||
     rolUpper === "SUPER";
   const puedeCrearRolSuper = rolUpper === "SUPER";
-  const puedeSimular = rolUpper === "SUPER";
+  const puedeSimular = esSuperReal && !simulando;
   const esAdminOSuper =
     rolUpper === "ADMINISTRADOR" ||
     rolUpper === "ADMIN" ||
@@ -258,6 +306,7 @@ export default function Ver() {
   const puedeCrearLiderOEmpleado = esAdminOSuper || esSedeSesion;
   const soloLecturaSede = esSedeSesion;
   const esLider = rolUpper === "LIDER";
+  const esCoordinadorSesion = esRolCoordinador(rol);
 
   const esRolLiderOEmpleado = (rolUsuario?: string | null) => {
     const n = (rolUsuario || "").toUpperCase().trim();
@@ -273,6 +322,25 @@ export default function Ver() {
 
   const handleSimular = () => {
     setLiderSimulado((prev) => (prev ? null : LIDER_SIMULADO));
+  };
+
+  const elegirRolSimulado = (objetivo: string) => {
+    if (objetivo === "SUPER") {
+      setRolSimulado(null);
+    } else {
+      if (!usuarioDeRol(objetivo)) {
+        toast.warning("No hay un usuario con ese rol. La vista usa tu perfil.");
+      }
+      setRolSimulado(objetivo);
+    }
+    setLiderParaCelula(null);
+    setSearchTerm("");
+    setVistaCoordinador("celula");
+    if (objetivo === "ADMIN") setActiveTab("Administrativos");
+    else if (objetivo === "EMPLEADO") setActiveTab("Empleados");
+    else if (objetivo === "LIDER" || objetivo === "COORDINADOR") {
+      setActiveTab("Lideres");
+    } else setActiveTab("Sede");
   };
 
   const { data: configSis } = useQuery({
@@ -377,6 +445,10 @@ export default function Ver() {
     (u) => (u.rol || "").toUpperCase() === "LIDER",
   );
 
+  const enlacesDelCoordinador = lideresBase.filter(
+    (u) => u.coordinador_id === userId,
+  );
+
   const lideresVisibles = (() => {
     const base = liderSimulado ? [liderSimulado, ...lideres] : lideres;
     return base.filter((l) => {
@@ -390,7 +462,12 @@ export default function Ver() {
 
   const lideresParaFormulario = esAdminOSuper
     ? lideresVisibles
-    : lideresVisibles.filter((l) => l.id === userId);
+    : esCoordinadorSesion
+      ? [
+          ...(miPerfilGlobal ? [miPerfilGlobal] : []),
+          ...enlacesDelCoordinador,
+        ]
+      : lideresVisibles.filter((l) => l.id === userId);
 
   const totalLideresRegistrados = lideresBase.length;
   const totalAdministrativosRegistrados = administrativos.length;
@@ -501,6 +578,12 @@ export default function Ver() {
     setLiderParaCelula(null);
   };
 
+  const irVistaCoordinador = (vista: "celula" | "enlaces") => {
+    setVistaCoordinador(vista);
+    setLiderParaCelula(null);
+    setSearchTerm("");
+  };
+
   const cambiarTab = (tab: Tab) => {
     if (
       soloLecturaSede &&
@@ -581,11 +664,14 @@ export default function Ver() {
 
   return (
     <>
-      {!isDashboardLoading && userId && (
+      {!isDashboardLoading && session?.id && (
         <ModalBienvenida
-          userId={userId}
-          conteoAfiliados={miPerfilGlobal?.conteoAfiliados || 0}
-          nombreLider={miPerfilGlobal?.nombres || "Usuario"}
+          userId={session.id}
+          conteoAfiliados={
+            usuariosCrudos.find((u) => u.id === session.id)?.conteoAfiliados ||
+            0
+          }
+          nombreLider={session.nombres || "Usuario"}
         />
       )}
       <div className="px-2 md:px-6 max-w-full overflow-x-hidden min-w-0 w-full pb-20 md:pb-28">
@@ -611,15 +697,68 @@ export default function Ver() {
               </span>
             )}
           </div>
-          {vistaConPestanas && (
-            <Button
-              onClick={() => setIsEstadisticasOpen(true)}
-              variant="outline"
-              className="gap-1.5 h-10 px-3 text-sm font-bold border-blue-500 dark:border-blue-500 text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/50 shadow-sm hover:bg-blue-200 dark:hover:bg-blue-900 hover:text-blue-900 dark:hover:text-blue-100 hover:shadow-md transition-all w-full sm:w-auto shrink-0"
-            >
-              <BarChart3 className="w-4 h-4 shrink-0" />
-              Estadísticas
-            </Button>
+          {(vistaConPestanas || esSuperReal) && (
+            <div className="flex w-full sm:w-auto items-center gap-2">
+              {esSuperReal && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className={`gap-1.5 h-10 px-3 text-sm font-bold shadow-sm transition-all w-full sm:w-auto shrink-0 ${
+                        simulando
+                          ? "border-amber-500 text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-950/60"
+                          : "border-neutral-400 dark:border-neutral-500 text-neutral-800 dark:text-neutral-200 bg-neutral-50 dark:bg-neutral-900 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                      }`}
+                    >
+                      <UserCog className="w-4 h-4 shrink-0" />
+                      {simulando
+                        ? ROLES_SIMULACION.find((r) => r.id === rolSimulado)
+                            ?.label || "Simular rol"
+                        : "Simular rol"}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="min-w-[11rem]">
+                    {ROLES_SIMULACION.map((opcion) => {
+                      const activo =
+                        opcion.id === "SUPER"
+                          ? !simulando
+                          : rolSimulado === opcion.id;
+                      const persona = usuarioDeRol(opcion.id);
+                      return (
+                        <DropdownMenuItem
+                          key={opcion.id}
+                          className="cursor-pointer gap-2"
+                          onClick={() => elegirRolSimulado(opcion.id)}
+                        >
+                          <Check
+                            className={`h-4 w-4 shrink-0 ${activo ? "opacity-100" : "opacity-0"}`}
+                          />
+                          <span className="flex min-w-0 flex-col">
+                            <span className="font-semibold">{opcion.label}</span>
+                            {persona && opcion.id !== "SUPER" && (
+                              <span className="truncate text-[11px] text-gray-500">
+                                {persona.nombres} {persona.apellidos}
+                              </span>
+                            )}
+                          </span>
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+              {vistaConPestanas && (
+                <Button
+                  onClick={() => setIsEstadisticasOpen(true)}
+                  variant="outline"
+                  className="gap-1.5 h-10 px-3 text-sm font-bold border-blue-500 dark:border-blue-500 text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/50 shadow-sm hover:bg-blue-200 dark:hover:bg-blue-900 hover:text-blue-900 dark:hover:text-blue-100 hover:shadow-md transition-all w-full sm:w-auto shrink-0"
+                >
+                  <BarChart3 className="w-4 h-4 shrink-0" />
+                  Estadísticas
+                </Button>
+              )}
+            </div>
           )}
         </div>
 
@@ -636,6 +775,133 @@ export default function Ver() {
               ))}
             </div>
           </div>
+        ) : !vistaConPestanas && esCoordinadorSesion ? (
+          <>
+            <MetaGeneral
+              totalSede={0}
+              totalLideres={enlacesDelCoordinador.reduce(
+                (acc, u) => acc + (u.conteoAfiliados || 0),
+                0,
+              )}
+              totalEmpleados={0}
+              totalCoordinadores={miPerfilGlobal?.conteoAfiliados || 0}
+              objetivoTotal={configSis?.objetivo_total || 0}
+              mostrarSede={false}
+              mostrarEmpleados={false}
+              mostrarCoordinadores
+            />
+            <div className="mb-6 w-full min-w-0 border-b border-gray-200 dark:border-neutral-800">
+              <div className="grid w-full min-w-0 grid-cols-2 gap-1 md:flex md:flex-nowrap">
+                {(
+                  [
+                    {
+                      id: "celula" as const,
+                      label: "Mi célula",
+                      count: miPerfilGlobal?.conteoAfiliados || 0,
+                      icon: UsersRound,
+                    },
+                    {
+                      id: "enlaces" as const,
+                      label: "Enlaces",
+                      count: enlacesDelCoordinador.length,
+                      icon: PiMedalDuotone,
+                    },
+                  ] as const
+                ).map((tab) => {
+                  const Icon = tab.icon;
+                  const activo =
+                    vistaCoordinador === tab.id && !liderParaCelula;
+                  const theme =
+                    tab.id === "celula"
+                      ? TAB_THEMES.Coordinadores
+                      : TAB_THEMES.Lideres;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => irVistaCoordinador(tab.id)}
+                      className={tabBtnClass(
+                        activo,
+                        tab.id === "celula" ? "Coordinadores" : "Lideres",
+                      )}
+                    >
+                      <span
+                        className={tabPillClass(
+                          activo,
+                          tab.id === "celula" ? "Coordinadores" : "Lideres",
+                        )}
+                      >
+                        <span className={tabIconClass()}>
+                          <Icon className="h-5 w-5 shrink-0 md:h-6 md:w-6" />
+                        </span>
+                        <span className="whitespace-normal text-center leading-tight sm:whitespace-nowrap">
+                          {tab.label}
+                        </span>
+                        <span className={tabBadgeClass()}>{tab.count}</span>
+                        {activo && (
+                          <span
+                            className={`absolute -bottom-[9px] left-0 right-0 z-20 h-[2px] rounded-full md:-bottom-[11px] md:h-[3px] ${theme.lineBg}`}
+                          />
+                        )}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            {liderParaCelula ? (
+              <Celula
+                mode="embedded"
+                lider={liderParaCelula}
+                onClose={handleVolverDeCelula}
+                onEditar={handleOpenEditModal}
+                onAnadirAfiliado={handleOpenAnadirAfiliadoModal}
+                onDataChange={fetchData}
+                rolUsuarioSesion={rolSesionCelula}
+                usuarios={allUsers}
+              />
+            ) : vistaCoordinador === "celula" ? (
+              miPerfilGlobal ? (
+                <Celula
+                  mode="embedded"
+                  lider={miPerfilGlobal}
+                  onEditar={handleOpenEditModal}
+                  onAnadirAfiliado={handleOpenAnadirAfiliadoModal}
+                  onDataChange={fetchData}
+                  rolUsuarioSesion={rolSesionCelula}
+                  usuarios={allUsers}
+                />
+              ) : (
+                <div className="text-center text-gray-500 dark:text-gray-400 mt-8 border border-gray-200 dark:border-neutral-700 rounded-lg p-4">
+                  No se encontró tu perfil de usuario.
+                </div>
+              )
+            ) : (
+              renderPanelTab(
+                "Lideres",
+                <Lideres
+                  lideres={enlacesDelCoordinador}
+                  onVerCelula={handleOpenCelula}
+                  onEditar={handleOpenEditLiderModal}
+                  rolUsuarioSesion={rolSesionCelula}
+                  onDataChange={refreshAfterDeletion}
+                  searchTerm={searchTerm}
+                  idUsuarioSesion={userId}
+                  isLoading={cargandoLideres}
+                  tema={getTemaTab("Lideres")}
+                />,
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => handleOpenCreateUsuarioModal("LIDER")}
+                  className="gap-1.5 h-10 px-3 text-sm font-semibold border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/40 hover:bg-orange-100 dark:hover:bg-orange-950/60 shadow-sm w-full sm:w-auto"
+                >
+                  <PiMedalDuotone className="w-4 h-4 shrink-0" />
+                  Nuevo Enlace
+                </Button>,
+              )
+            )}
+          </>
         ) : !vistaConPestanas ? (
           <>
             <MetaGeneral
@@ -1161,6 +1427,9 @@ export default function Ver() {
                     rolSesion={rol}
                     modoCrearSede={modoCrearSede}
                     rolInicial={rolCreacionInicial}
+                    coordinadorId={
+                      simulando && esCoordinadorSesion ? userId : null
+                    }
                   />
                 </div>
               </DialogPanel>

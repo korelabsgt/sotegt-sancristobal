@@ -7,6 +7,7 @@ export interface Lider {
   apellidos: string;
   rol: string;
   nivel_compromiso?: "bajo" | "medio" | "alto" | null;
+  coordinador_id?: string | null;
   conteoAfiliados?: number;
   conteoTitulares?: number;
   conteoFamiliares?: number;

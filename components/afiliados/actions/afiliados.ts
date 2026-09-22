@@ -5,11 +5,50 @@ import supabaseAdmin from "@/utils/supabase/admin";
 
 export async function obtenerAfiliadosAction(liderId?: string) {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  let query = supabase.from("afiliados").select("*");
+  let cliente: typeof supabase | typeof supabaseAdmin = supabase;
+  let idsPermitidos: string[] | null = null;
+
+  if (user?.id) {
+    const { data: perfil } = await supabase
+      .from("info_perfil")
+      .select("roles(nombre)")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    const roles = perfil?.roles as
+      | { nombre?: string }
+      | { nombre?: string }[]
+      | null;
+    const nombreRol = (
+      (Array.isArray(roles) ? roles[0]?.nombre : roles?.nombre) || ""
+    )
+      .toUpperCase()
+      .trim();
+    const esCoordinador =
+      nombreRol === "COORDINADOR" || nombreRol === "COORDINADORES";
+    if (esCoordinador) {
+      const { data: enlaces } = await supabaseAdmin
+        .from("info_perfil")
+        .select("user_id")
+        .eq("coordinador_id", user.id);
+      idsPermitidos = [
+        user.id,
+        ...(enlaces || []).map((enlace) => enlace.user_id as string),
+      ];
+      if (liderId && !idsPermitidos.includes(liderId)) return [];
+      cliente = supabaseAdmin;
+    }
+  }
+
+  let query = cliente.from("afiliados").select("*");
 
   if (liderId) {
     query = query.eq("lider_id", liderId);
+  } else if (idsPermitidos) {
+    query = query.in("lider_id", idsPermitidos);
   }
 
   const { data: afiliados, error } = await query.order("created_at", {
