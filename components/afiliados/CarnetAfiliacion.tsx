@@ -24,6 +24,7 @@ interface Props {
 const CARNET_WIDTH_MM = 85.6;
 const CARNET_HEIGHT_MM = 53.98;
 const CARNET_DISPLAY_PX = 400;
+const CARNET_EXPORT_SCALE = 3;
 const BUCKET_SETTINGS = "settings";
 const BUCKET_DPIS = "dpis";
 const DPI_FOTO_LEFT = 0.71;
@@ -46,6 +47,19 @@ function etiquetaGenero(sexo: string | null | undefined): string {
   if (sexo === "M") return "Masculino";
   if (sexo === "F") return "Femenino";
   return sexo || "—";
+}
+
+async function urlADataUrl(src: string): Promise<string> {
+  if (src.startsWith("data:")) return src;
+  const res = await fetch(src, { mode: "cors", credentials: "omit", cache: "no-store" });
+  if (!res.ok) throw new Error(`No se pudo cargar imagen (${res.status})`);
+  const blob = await res.blob();
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error ?? new Error("FileReader"));
+    reader.readAsDataURL(blob);
+  });
 }
 
 const VALOR_PRIMARY = "#1898A1";
@@ -142,9 +156,18 @@ export default function CarnetAfiliacion({ afiliado, open, onClose }: Props) {
       return data?.signedUrl ?? null;
     };
     void (async () => {
-      const [partido, foto] = await Promise.all([
+      const [partidoFirmado, fotoFirmada] = await Promise.all([
         firmar(BUCKET_SETTINGS, config?.partido_url),
         firmar(BUCKET_DPIS, afiliado?.dpi_frontal_url),
+      ]);
+      if (cancelado) return;
+      const [partido, foto] = await Promise.all([
+        partidoFirmado
+          ? urlADataUrl(partidoFirmado).catch(() => partidoFirmado)
+          : Promise.resolve(null),
+        fotoFirmada
+          ? urlADataUrl(fotoFirmada).catch(() => fotoFirmada)
+          : Promise.resolve(null),
       ]);
       if (cancelado) return;
       setPartidoSrc(partido);
@@ -204,6 +227,8 @@ export default function CarnetAfiliacion({ afiliado, open, onClose }: Props) {
 
     const ancho = CARNET_DISPLAY_PX;
     const alto = Math.round(ancho * (CARNET_HEIGHT_MM / CARNET_WIDTH_MM));
+    const anchoOut = Math.round(ancho * CARNET_EXPORT_SCALE);
+    const altoOut = Math.round(alto * CARNET_EXPORT_SCALE);
 
     const host = document.createElement("div");
     host.setAttribute("aria-hidden", "true");
@@ -214,13 +239,16 @@ export default function CarnetAfiliacion({ afiliado, open, onClose }: Props) {
       "z-index:-1",
       "pointer-events:none",
       "background:#ffffff",
+      `width:${anchoOut}px`,
+      `height:${altoOut}px`,
+      "overflow:hidden",
     ].join(";");
 
     const clone = nodo.cloneNode(true) as HTMLElement;
     clone.style.width = `${ancho}px`;
     clone.style.height = `${alto}px`;
     clone.style.maxWidth = "none";
-    clone.style.transform = "none";
+    clone.style.transform = `scale(${CARNET_EXPORT_SCALE})`;
     clone.style.transformOrigin = "top left";
     clone.style.margin = "0";
     clone.style.position = "relative";
@@ -230,20 +258,37 @@ export default function CarnetAfiliacion({ afiliado, open, onClose }: Props) {
     document.body.appendChild(host);
 
     try {
+      const imgs = Array.from(clone.querySelectorAll("img"));
+      await Promise.all(
+        imgs.map(async (img) => {
+          const src = img.getAttribute("src") || img.src;
+          if (!src) return;
+          try {
+            const dataUrl = await urlADataUrl(src);
+            img.setAttribute("src", dataUrl);
+            img.removeAttribute("crossorigin");
+          } catch {
+            /* keep original */
+          }
+        }),
+      );
       await esperarImagenes(clone);
-      await new Promise((r) => requestAnimationFrame(() => r(null)));
+      await new Promise((r) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => r(null))),
+      );
 
       const { toPng } = await import("html-to-image");
       return await toPng(clone, {
-        cacheBust: true,
-        pixelRatio: 3,
+        cacheBust: false,
+        pixelRatio: 1,
         backgroundColor: "#ffffff",
-        width: ancho,
-        height: alto,
+        width: anchoOut,
+        height: altoOut,
         style: {
           width: `${ancho}px`,
           height: `${alto}px`,
-          transform: "none",
+          transform: `scale(${CARNET_EXPORT_SCALE})`,
+          transformOrigin: "top left",
           margin: "0",
         },
       });
@@ -440,9 +485,9 @@ export default function CarnetAfiliacion({ afiliado, open, onClose }: Props) {
                 <div className="relative z-10 h-[72%] px-3.5 pt-2">
                   {partidoSrc && (
                     <img
+                      data-carnet-logo
                       src={partidoSrc}
                       alt="Valor"
-                      crossOrigin="anonymous"
                       className="pointer-events-none absolute right-4 top-0.5 z-20 h-[5.75rem] w-[6.25rem] object-contain object-bottom"
                       draggable={false}
                     />
@@ -450,9 +495,9 @@ export default function CarnetAfiliacion({ afiliado, open, onClose }: Props) {
                   {fotoDpiSrc && (
                     <div className="pointer-events-none absolute right-5 top-[6.35rem] z-20 aspect-[3/4] w-[5.25rem] overflow-hidden rounded-md border-[1.5px] border-[#1898A1]">
                       <img
+                        data-carnet-foto
                         src={fotoDpiSrc}
                         alt=""
-                        crossOrigin="anonymous"
                         className="absolute max-w-none"
                         draggable={false}
                         style={{
