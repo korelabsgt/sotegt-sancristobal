@@ -38,6 +38,7 @@ export interface Lider {
   conteoAfiliados?: number;
   conteoTitulares?: number;
   conteoFamiliares?: number;
+  coordinador_id?: string | null;
   simulado?: boolean;
 }
 
@@ -51,6 +52,7 @@ interface Props {
   idUsuarioSesion: string;
   isLoading?: boolean;
   tema?: TemaLista;
+  enlacesDisponibles?: Lider[];
 }
 
 function LideresSkeleton() {
@@ -83,6 +85,7 @@ export default function Lideres({
   idUsuarioSesion,
   isLoading = false,
   tema = TEMA_LIDERES,
+  enlacesDisponibles = [],
 }: Props) {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState<number | "all">(15);
@@ -97,7 +100,6 @@ export default function Lideres({
   const puedeGestionarUsuarios =
     esAdminOSuper ||
     rolUpper === "DOCUMENTADOR" ||
-    esSedeSesion ||
     esRolCoordinador(rolUpper);
 
   const { data: config } = useQuery({
@@ -118,9 +120,16 @@ export default function Lideres({
         if (b.simulado) return 1;
         if (a.id === idUsuarioSesion) return -1;
         if (b.id === idUsuarioSesion) return 1;
+        const aCoord = esRolCoordinador(a.rol);
+        const bCoord = esRolCoordinador(b.rol);
+        const countEnlaces = (id: string) =>
+          enlacesDisponibles.filter((e) => e.coordinador_id === id).length;
+        if (aCoord || bCoord) {
+          return countEnlaces(b.id) - countEnlaces(a.id);
+        }
         return (b.conteoAfiliados || 0) - (a.conteoAfiliados || 0);
       }),
-    [lideres, idUsuarioSesion],
+    [lideres, idUsuarioSesion, enlacesDisponibles],
   );
 
   const filteredLideres = useMemo(() => {
@@ -167,7 +176,13 @@ export default function Lideres({
       <div className="flex flex-col gap-3">
         <AnimatePresence initial={false}>
           {lideresPaginados.map((lider, index) => {
-            const totalEnGrupo = lider.conteoAfiliados || 0;
+            const esCoord = esRolCoordinador(lider.rol);
+            const enlacesDe = esCoord
+              ? enlacesDisponibles.filter((e) => e.coordinador_id === lider.id)
+              : [];
+            const totalEnGrupo = esCoord
+              ? enlacesDe.length
+              : lider.conteoAfiliados || 0;
             const { meta: metaCelula, min: metaMinima } = metasPorRol(
               config,
               lider.rol,
@@ -298,12 +313,12 @@ export default function Lideres({
                     <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                       <div
                         className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md border shrink-0 ${estiloTotal}`}
-                        title="Total"
+                        title={esCoord ? "Enlaces" : "Total"}
                       >
                         <span
                           className={`text-xs md:text-sm font-black uppercase leading-none ${textoColor}`}
                         >
-                          Total
+                          {esCoord ? "Enlaces" : "Total"}
                         </span>
                         <span
                           className={`text-xs md:text-sm font-black leading-none ${textoColor}`}
@@ -311,6 +326,8 @@ export default function Lideres({
                           {totalEnGrupo}/{metaCelula}
                         </span>
                       </div>
+                      {!esCoord && (
+                        <>
                       <div
                         className="flex items-center gap-1.5 bg-blue-50 dark:bg-blue-950/50 px-2 py-1.5 rounded-md border border-blue-100 dark:border-blue-800"
                         title="Titulares"
@@ -335,6 +352,8 @@ export default function Lideres({
                           {lider.conteoFamiliares || 0}
                         </span>
                       </div>
+                        </>
+                      )}
                     </div>
                     {puedeEntrar && (
                       <button
@@ -347,6 +366,31 @@ export default function Lideres({
                       </button>
                     )}
                   </div>
+                  {esCoord && (
+                    <div className="flex flex-col gap-1.5 w-full">
+                      {enlacesDe.length === 0 ? (
+                        <p className="text-[10px] font-bold uppercase text-gray-400 dark:text-neutral-500">
+                          Sin enlaces
+                        </p>
+                      ) : (
+                        enlacesDe.map((enlace) => (
+                          <button
+                            key={enlace.id}
+                            type="button"
+                            onClick={() => onVerCelula(enlace)}
+                            className={`flex w-full items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors ${tema.cardBorder} bg-gray-50 dark:bg-neutral-800/60 hover:bg-cyan-50 dark:hover:bg-cyan-950/30`}
+                          >
+                            <span className="min-w-0 truncate text-xs font-bold uppercase text-gray-800 dark:text-gray-100">
+                              {enlace.nombres} {enlace.apellidos}
+                            </span>
+                            <span className="shrink-0 text-[10px] font-black tabular-nums text-gray-500 dark:text-gray-400">
+                              {enlace.conteoAfiliados || 0}
+                            </span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
                 </div>
               </motion.div>
             );

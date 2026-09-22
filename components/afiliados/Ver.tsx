@@ -19,6 +19,7 @@ import {
   UserCog,
   UsersRound,
   X,
+  ArrowLeft,
 } from "lucide-react";
 import {
   Fragment,
@@ -220,6 +221,8 @@ export default function Ver() {
   );
   const [liderAEditar, setLiderAEditar] = useState<Lider | null>(null);
   const [liderParaCelula, setLiderParaCelula] = useState<Lider | null>(null);
+  const [coordinadorParaEnlaces, setCoordinadorParaEnlaces] =
+    useState<Lider | null>(null);
   const [liderParaNuevoAfiliado, setLiderParaNuevoAfiliado] = useState<
     string | null
   >(null);
@@ -231,9 +234,6 @@ export default function Ver() {
   const [searchTerm, setSearchTerm] = useState("");
   const [liderSimulado, setLiderSimulado] = useState<Lider | null>(null);
   const [rolSimulado, setRolSimulado] = useState<string | null>(null);
-  const [vistaCoordinador, setVistaCoordinador] = useState<
-    "celula" | "enlaces"
-  >("celula");
 
   const { data: dashboardData, isPending: isDashboardPending } = useQuery({
     queryKey: ["dashboard-data"],
@@ -334,8 +334,8 @@ export default function Ver() {
       setRolSimulado(objetivo);
     }
     setLiderParaCelula(null);
+    setCoordinadorParaEnlaces(null);
     setSearchTerm("");
-    setVistaCoordinador("celula");
     if (objetivo === "ADMIN") setActiveTab("Administrativos");
     else if (objetivo === "EMPLEADO") setActiveTab("Empleados");
     else if (objetivo === "LIDER" || objetivo === "COORDINADOR") {
@@ -458,6 +458,10 @@ export default function Ver() {
     });
   })();
 
+  const enlacesSinCoordinador = lideresVisibles.filter(
+    (l) => l.simulado || !l.coordinador_id,
+  );
+
   const coordinadoresVisibles = coordinadores;
 
   const lideresParaFormulario = esAdminOSuper
@@ -526,7 +530,7 @@ export default function Ver() {
   };
 
   const handleOpenEditLiderModal = (lider: Lider) => {
-    if (esSedeSesion && !esRolLiderOEmpleado(lider.rol)) return;
+    if (esSedeSesion) return;
     setLiderAEditar(lider);
     setModoCrearSede(false);
     setRolCreacionInicial(null);
@@ -571,6 +575,15 @@ export default function Ver() {
 
   const handleOpenCelula = (lider: Lider) => {
     if (!lider) return;
+    if (esRolCoordinador(lider.rol)) {
+      setCoordinadorParaEnlaces(lider);
+      setLiderParaCelula(null);
+      return;
+    }
+    if (!coordinadorParaEnlaces && lider.coordinador_id) {
+      const coord = coordinadores.find((c) => c.id === lider.coordinador_id);
+      if (coord) setCoordinadorParaEnlaces(coord);
+    }
     setLiderParaCelula(lider);
   };
 
@@ -578,10 +591,9 @@ export default function Ver() {
     setLiderParaCelula(null);
   };
 
-  const irVistaCoordinador = (vista: "celula" | "enlaces") => {
-    setVistaCoordinador(vista);
+  const handleVolverDeEnlacesCoordinador = () => {
     setLiderParaCelula(null);
-    setSearchTerm("");
+    setCoordinadorParaEnlaces(null);
   };
 
   const cambiarTab = (tab: Tab) => {
@@ -599,6 +611,7 @@ export default function Ver() {
     setActiveTab(tab);
     setSearchTerm("");
     setLiderParaCelula(null);
+    setCoordinadorParaEnlaces(null);
   };
 
   const getTemaTab = (tab: Tab): TemaLista => {
@@ -784,71 +797,12 @@ export default function Ver() {
                 0,
               )}
               totalEmpleados={0}
-              totalCoordinadores={miPerfilGlobal?.conteoAfiliados || 0}
+              totalCoordinadores={enlacesDelCoordinador.length}
               objetivoTotal={configSis?.objetivo_total || 0}
               mostrarSede={false}
               mostrarEmpleados={false}
               mostrarCoordinadores
             />
-            <div className="mb-6 w-full min-w-0 border-b border-gray-200 dark:border-neutral-800">
-              <div className="grid w-full min-w-0 grid-cols-2 gap-1 md:flex md:flex-nowrap">
-                {(
-                  [
-                    {
-                      id: "celula" as const,
-                      label: "Mi célula",
-                      count: miPerfilGlobal?.conteoAfiliados || 0,
-                      icon: UsersRound,
-                    },
-                    {
-                      id: "enlaces" as const,
-                      label: "Enlaces",
-                      count: enlacesDelCoordinador.length,
-                      icon: PiMedalDuotone,
-                    },
-                  ] as const
-                ).map((tab) => {
-                  const Icon = tab.icon;
-                  const activo =
-                    vistaCoordinador === tab.id && !liderParaCelula;
-                  const theme =
-                    tab.id === "celula"
-                      ? TAB_THEMES.Coordinadores
-                      : TAB_THEMES.Lideres;
-                  return (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => irVistaCoordinador(tab.id)}
-                      className={tabBtnClass(
-                        activo,
-                        tab.id === "celula" ? "Coordinadores" : "Lideres",
-                      )}
-                    >
-                      <span
-                        className={tabPillClass(
-                          activo,
-                          tab.id === "celula" ? "Coordinadores" : "Lideres",
-                        )}
-                      >
-                        <span className={tabIconClass()}>
-                          <Icon className="h-5 w-5 shrink-0 md:h-6 md:w-6" />
-                        </span>
-                        <span className="whitespace-normal text-center leading-tight sm:whitespace-nowrap">
-                          {tab.label}
-                        </span>
-                        <span className={tabBadgeClass()}>{tab.count}</span>
-                        {activo && (
-                          <span
-                            className={`absolute -bottom-[9px] left-0 right-0 z-20 h-[2px] rounded-full md:-bottom-[11px] md:h-[3px] ${theme.lineBg}`}
-                          />
-                        )}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
             {liderParaCelula ? (
               <Celula
                 mode="embedded"
@@ -860,22 +814,6 @@ export default function Ver() {
                 rolUsuarioSesion={rolSesionCelula}
                 usuarios={allUsers}
               />
-            ) : vistaCoordinador === "celula" ? (
-              miPerfilGlobal ? (
-                <Celula
-                  mode="embedded"
-                  lider={miPerfilGlobal}
-                  onEditar={handleOpenEditModal}
-                  onAnadirAfiliado={handleOpenAnadirAfiliadoModal}
-                  onDataChange={fetchData}
-                  rolUsuarioSesion={rolSesionCelula}
-                  usuarios={allUsers}
-                />
-              ) : (
-                <div className="text-center text-gray-500 dark:text-gray-400 mt-8 border border-gray-200 dark:border-neutral-700 rounded-lg p-4">
-                  No se encontró tu perfil de usuario.
-                </div>
-              )
             ) : (
               renderPanelTab(
                 "Lideres",
@@ -963,9 +901,9 @@ export default function Ver() {
                     {
                       id: "Lideres" as Tab,
                       label: "Enlaces",
-                      count: totalLideresRegistrados,
+                      count: enlacesSinCoordinador.length,
                       icon: PiMedalDuotone,
-                      show: true,
+                      show: esAdminOSuper || esSedeSesion,
                     },
                     {
                       id: "Empleados" as Tab,
@@ -1072,6 +1010,53 @@ export default function Ver() {
                     usuarios={allUsers}
                   />
                 </motion.div>
+              ) : coordinadorParaEnlaces && activeTab === "Coordinadores" ? (
+                <motion.div
+                  key={`enlaces-coord-${coordinadorParaEnlaces.id}`}
+                  custom={tabSlideDir}
+                  initial={{ opacity: 0, x: tabSlideDir * 36 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: tabSlideDir * -28 }}
+                  transition={{ duration: 0.45, ease: tabEase }}
+                >
+                  <div className="mb-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleVolverDeEnlacesCoordinador}
+                      className="gap-1.5 h-9 px-3 text-sm"
+                    >
+                      <ArrowLeft className="w-4 h-4 shrink-0" />
+                      Volver
+                    </Button>
+                  </div>
+                  {renderPanelTab(
+                    "Lideres",
+                    <Lideres
+                      lideres={lideresBase.filter(
+                        (u) =>
+                          u.coordinador_id === coordinadorParaEnlaces.id,
+                      )}
+                      onVerCelula={handleOpenCelula}
+                      onEditar={handleOpenEditLiderModal}
+                      rolUsuarioSesion={rolSesionCelula}
+                      onDataChange={refreshAfterDeletion}
+                      searchTerm={searchTerm}
+                      idUsuarioSesion={userId}
+                      isLoading={cargandoLideres}
+                      tema={getTemaTab("Lideres")}
+                    />,
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => handleOpenCreateUsuarioModal("LIDER")}
+                      className="gap-1.5 h-10 px-3 text-sm font-semibold border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/40 hover:bg-orange-100 dark:hover:bg-orange-950/60 shadow-sm w-full sm:w-auto"
+                    >
+                      <PiMedalDuotone className="w-4 h-4 shrink-0" />
+                      Nuevo Enlace
+                    </Button>,
+                  )}
+                </motion.div>
               ) : (
                 <motion.div
                   key={activeTab}
@@ -1162,6 +1147,7 @@ export default function Ver() {
                       "Coordinadores",
                       <Lideres
                         lideres={coordinadoresVisibles}
+                        enlacesDisponibles={lideresBase}
                         onVerCelula={handleOpenCelula}
                         onEditar={handleOpenEditLiderModal}
                         rolUsuarioSesion={rolSesionCelula}
@@ -1188,7 +1174,7 @@ export default function Ver() {
                     renderPanelTab(
                       "Lideres",
                       <Lideres
-                        lideres={lideresVisibles}
+                        lideres={enlacesSinCoordinador}
                         onVerCelula={handleOpenCelula}
                         onEditar={handleOpenEditLiderModal}
                         rolUsuarioSesion={rolSesionCelula}
@@ -1428,7 +1414,9 @@ export default function Ver() {
                     modoCrearSede={modoCrearSede}
                     rolInicial={rolCreacionInicial}
                     coordinadorId={
-                      simulando && esCoordinadorSesion ? userId : null
+                      esCoordinadorSesion
+                        ? userId
+                        : coordinadorParaEnlaces?.id ?? null
                     }
                   />
                 </div>
