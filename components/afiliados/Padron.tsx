@@ -173,6 +173,9 @@ export default function Padron() {
             </button>
             <span className="text-sm text-gray-800 dark:text-gray-100 tabular-nums">
               {page}/{totalPages}
+              <span className="ml-2 text-xs font-bold text-teal-700 dark:text-teal-400">
+                {totalCount.toLocaleString()}
+              </span>
             </span>
             <button
               type="button"
