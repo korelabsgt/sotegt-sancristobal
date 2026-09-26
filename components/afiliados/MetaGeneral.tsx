@@ -41,8 +41,7 @@ function pctParte(valor: number, total: number) {
 
 function textoPct(valor: number, total: number) {
   const p = pctParte(valor, total);
-  if (p === 0) return "0%";
-  if (p < 10) return `${p.toFixed(1)}%`;
+  if (p > 0 && p < 1) return `${p.toFixed(1)}%`;
   return `${Math.round(p)}%`;
 }
 
