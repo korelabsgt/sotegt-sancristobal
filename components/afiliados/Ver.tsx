@@ -72,7 +72,10 @@ import Form from "./forms/afiliados/Afiliados";
 import ReporteLideresClasificacion from "./reportes/ReporteLideresClasificacion";
 import { eliminar } from "./acciones";
 import { swalNoEliminarCelula } from "@/lib/swalTheme";
-import { obtenerAfiliadosAction } from "./actions/afiliados";
+import {
+  obtenerAfiliadosAction,
+  obtenerConteoPadronAction,
+} from "./actions/afiliados";
 import { obtenerConfiguracionAction } from "@/components/dashboard/actions/configuracion";
 import { AFILIADOS_SIMULADOS, LIDER_SIMULADO } from "./datosSimulados";
 
@@ -430,6 +433,12 @@ export default function Ver() {
     (acc, u) => acc + (u.conteoAfiliados || 0),
     0,
   );
+  const totalAfiliadosAdministrativos = allUsers
+    .filter((u) => {
+      const r = (u.rol || "").toUpperCase();
+      return r === "ADMIN" || r === "ADMINISTRADOR" || r === "SUPER";
+    })
+    .reduce((acc, u) => acc + (u.conteoAfiliados || 0), 0);
   const lugares = (dashboardData?.lugares || []) as Lugar[];
 
   const lideres = (() => {
@@ -480,7 +489,15 @@ export default function Ver() {
     totalAfiliadosCoordinadores +
     totalAfiliadosLideres +
     (hayEmpleadosHabilitada ? totalAfiliadosEmpleados : 0) +
+    totalAfiliadosAdministrativos +
     (liderSimulado ? AFILIADOS_SIMULADOS.length : 0);
+
+  const { data: conteoPadron } = useQuery({
+    queryKey: ["conteo_padron"],
+    queryFn: () => obtenerConteoPadronAction(),
+    enabled: esAdminOSuper && padronHabilitado,
+    staleTime: 5 * 60_000,
+  });
 
   const afiliadosVista = liderSimulado
     ? [...AFILIADOS_SIMULADOS, ...afiliados]
@@ -689,7 +706,7 @@ export default function Ver() {
       )}
       <div className="px-2 md:px-6 max-w-full overflow-x-hidden min-w-0 w-full pb-20 md:pb-28">
         <ConfiguracionSistema showMetas={false} allowEditing={false} />
-        <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 min-w-0 w-full">
+        <div className="mb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2 min-w-0 w-full">
           <div
             className={`relative shrink-0 min-w-0 ${puedeSimular ? "group" : ""}`}
           >
@@ -711,14 +728,14 @@ export default function Ver() {
             )}
           </div>
           {(vistaConPestanas || esSuperReal) && (
-            <div className="flex w-full sm:w-auto items-center gap-2">
+            <div className="flex w-full md:w-auto items-center gap-2">
               {esSuperReal && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
                       type="button"
                       variant="outline"
-                      className={`gap-1.5 h-10 px-3 text-sm font-bold shadow-sm transition-all w-full sm:w-auto shrink-0 ${
+                      className={`gap-1.5 h-10 px-3 text-sm font-bold shadow-sm transition-all flex-1 md:flex-none md:w-auto min-w-0 ${
                         simulando
                           ? "border-amber-500 text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-950/60"
                           : "border-neutral-400 dark:border-neutral-500 text-neutral-800 dark:text-neutral-200 bg-neutral-50 dark:bg-neutral-900 hover:bg-neutral-100 dark:hover:bg-neutral-800"
@@ -765,7 +782,7 @@ export default function Ver() {
                 <Button
                   onClick={() => setIsEstadisticasOpen(true)}
                   variant="outline"
-                  className="gap-1.5 h-10 px-3 text-sm font-bold border-blue-500 dark:border-blue-500 text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/50 shadow-sm hover:bg-blue-200 dark:hover:bg-blue-900 hover:text-blue-900 dark:hover:text-blue-100 hover:shadow-md transition-all w-full sm:w-auto shrink-0"
+                  className="gap-1.5 h-10 px-3 text-sm font-bold border-blue-500 dark:border-blue-500 text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/50 shadow-sm hover:bg-blue-200 dark:hover:bg-blue-900 hover:text-blue-900 dark:hover:text-blue-100 hover:shadow-md transition-all flex-1 md:flex-none md:w-auto min-w-0"
                 >
                   <BarChart3 className="w-4 h-4 shrink-0" />
                   Estadísticas
@@ -802,6 +819,7 @@ export default function Ver() {
               mostrarSede={false}
               mostrarEmpleados={false}
               mostrarCoordinadores
+              mostrarAdministrativos={false}
             />
             {liderParaCelula ? (
               <Celula
@@ -847,10 +865,12 @@ export default function Ver() {
               totalLideres={totalAfiliadosLideres}
               totalEmpleados={totalAfiliadosEmpleados}
               totalCoordinadores={totalAfiliadosCoordinadores}
+              totalAdministrativos={totalAfiliadosAdministrativos}
               objetivoTotal={configSis?.objetivo_total || 0}
               mostrarSede={haySedeHabilitada}
               mostrarEmpleados={hayEmpleadosHabilitada}
               mostrarCoordinadores
+              mostrarAdministrativos
             />
             {miPerfilGlobal ? (
               <Celula
@@ -875,10 +895,12 @@ export default function Ver() {
               totalLideres={totalAfiliadosLideres}
               totalEmpleados={totalAfiliadosEmpleados}
               totalCoordinadores={totalAfiliadosCoordinadores}
+              totalAdministrativos={totalAfiliadosAdministrativos}
               objetivoTotal={configSis?.objetivo_total || 0}
               mostrarSede={haySedeHabilitada}
               mostrarEmpleados={hayEmpleadosHabilitada}
               mostrarCoordinadores
+              mostrarAdministrativos
             />
             <div className="mb-6 w-full min-w-0 border-b border-gray-200 dark:border-neutral-800">
               <div className="grid w-full min-w-0 grid-cols-2 gap-1 sm:gap-0 md:flex md:flex-nowrap md:overflow-x-auto">
@@ -887,6 +909,7 @@ export default function Ver() {
                     {
                       id: "Sede" as Tab,
                       label: "Sede",
+                      labelCorto: "Sede",
                       count: totalAfiliadosSede,
                       icon: PiBuildingsDuotone,
                       show: haySedeHabilitada,
@@ -894,6 +917,7 @@ export default function Ver() {
                     {
                       id: "Coordinadores" as Tab,
                       label: "Coordinadores",
+                      labelCorto: "Coord.",
                       count: totalCoordinadoresRegistrados,
                       icon: UsersRound,
                       show: puedeCrearLiderOEmpleado,
@@ -901,6 +925,7 @@ export default function Ver() {
                     {
                       id: "Lideres" as Tab,
                       label: "Enlaces",
+                      labelCorto: "Enlaces",
                       count: enlacesSinCoordinador.length,
                       icon: PiMedalDuotone,
                       show: esAdminOSuper || esSedeSesion,
@@ -908,6 +933,7 @@ export default function Ver() {
                     {
                       id: "Empleados" as Tab,
                       label: "Empleados",
+                      labelCorto: "Emp.",
                       count: totalEmpleadosRegistrados,
                       icon: PiBriefcaseDuotone,
                       show: puedeCrearLiderOEmpleado && hayEmpleadosHabilitada,
@@ -915,6 +941,7 @@ export default function Ver() {
                     {
                       id: "Afiliados" as Tab,
                       label: "Miembros",
+                      labelCorto: "Miembros",
                       count: totalMiembrosGeneral,
                       icon: PiUsersThreeDuotone,
                       show: true,
@@ -922,13 +949,15 @@ export default function Ver() {
                     {
                       id: "Padron" as Tab,
                       label: "Padrón",
-                      count: null as number | null,
+                      labelCorto: "Padrón",
+                      count: (conteoPadron ?? null) as number | null,
                       icon: PiClipboardTextDuotone,
                       show: esAdminOSuper && padronHabilitado,
                     },
                     {
                       id: "Mensajes" as Tab,
                       label: "Mensajes",
+                      labelCorto: "Mensajes",
                       count: null as number | null,
                       icon: PiChatCircleDotsDuotone,
                       show: esAdminOSuper,
@@ -936,6 +965,7 @@ export default function Ver() {
                     {
                       id: "Administrativos" as Tab,
                       label: "Administrativos",
+                      labelCorto: "Admin.",
                       count: totalAdministrativosRegistrados,
                       icon: PiShieldCheckDuotone,
                       show: esAdminOSuper,
@@ -961,11 +991,18 @@ export default function Ver() {
                             <Icon className="h-5 w-5 shrink-0 md:h-6 md:w-6" />
                           </span>
                           <span className="whitespace-normal text-center leading-tight sm:whitespace-nowrap">
-                            {tab.label}
+                            <span className="md:hidden">{tab.labelCorto}</span>
+                            <span className="hidden md:inline">{tab.label}</span>
                           </span>
                           {tab.count !== null && (
                             <span className={tabBadgeClass()}>
-                              {tab.count > 999 ? "999+" : tab.count}
+                              {tab.id === "Padron"
+                                ? tab.count >= 10_000
+                                  ? `${(tab.count / 1000).toFixed(tab.count >= 100_000 ? 0 : 1)}k`
+                                  : tab.count.toLocaleString()
+                                : tab.count > 999
+                                  ? "999+"
+                                  : tab.count}
                             </span>
                           )}
                           {activo && (

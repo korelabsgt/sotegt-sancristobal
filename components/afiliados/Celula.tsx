@@ -156,19 +156,32 @@ export default function Celula({
   const panelBody = (
     <>
       <div className="px-3 lg:px-6 py-2 border-b border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-950 sticky top-0 z-20">
-        <div className="flex flex-row items-center gap-2 lg:gap-4 w-full min-w-0">
-          {onClose ? (
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex items-center gap-1.5 shrink-0 text-sm font-bold text-red-600 hover:text-red-700 underline underline-offset-[6px] decoration-red-600/90 hover:decoration-red-700 uppercase tracking-wide bg-transparent border-0 cursor-pointer transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4 shrink-0" />
-              <span className="hidden sm:inline">Volver</span>
-            </button>
-          ) : null}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2 lg:gap-4 w-full min-w-0">
+          <div className="flex items-center justify-between gap-2 w-full min-w-0 sm:contents">
+            {onClose ? (
+              <button
+                type="button"
+                onClick={onClose}
+                className="order-1 inline-flex items-center gap-1.5 shrink-0 text-sm font-bold text-red-600 hover:text-red-700 underline underline-offset-[6px] decoration-red-600/90 hover:decoration-red-700 uppercase tracking-wide bg-transparent border-0 cursor-pointer transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4 shrink-0" />
+                <span className="hidden sm:inline">Volver</span>
+              </button>
+            ) : null}
 
-          <div className="flex-1 min-w-0 max-w-md mx-auto">
+            <div className="order-2 sm:order-3 shrink-0 text-right px-1 min-w-0 max-w-[70%] sm:max-w-[12rem] lg:max-w-[16rem]">
+              <div className="flex items-center justify-end gap-1 min-w-0">
+                <h3 className={`text-[10px] sm:text-xs font-black uppercase leading-tight truncate ${tema.btnText}`}>
+                  {lider.nombres} {lider.apellidos}
+                </h3>
+                {isLoading && (
+                  <Loader2 className={`w-3 h-3 animate-spin shrink-0 ${tema.btnText}`} />
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="order-3 sm:order-2 flex-1 min-w-0 w-full sm:max-w-md mx-auto">
             <div className="flex bg-gray-200 dark:bg-neutral-800 p-1 rounded-lg gap-1 w-full">
               {TABS.map((tab) => (
                 <button
@@ -177,27 +190,16 @@ export default function Celula({
                     setVistaActual(tab.id as Vista);
                     setTitularFamilia(null);
                   }}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-[10px] font-bold transition-all ${
+                  className={`flex-1 flex items-center justify-center gap-1 min-w-0 py-2 rounded-md text-[10px] sm:text-[11px] font-bold transition-all ${
                     vistaActual === tab.id
                       ? switchActivoClass
                       : switchInactivoClass + " hover:bg-gray-300 dark:hover:bg-neutral-600"
                   }`}
                 >
                   <tab.icon className="w-3.5 h-3.5 shrink-0" />
-                  <span>{tab.label}</span>
+                  <span className="truncate">{tab.label}</span>
                 </button>
               ))}
-            </div>
-          </div>
-
-          <div className="shrink-0 text-right px-1 min-w-0 max-w-[40%] sm:max-w-[12rem] lg:max-w-[16rem]">
-            <div className="flex items-center justify-end gap-1 min-w-0">
-              <h3 className={`text-[10px] sm:text-xs font-black uppercase leading-tight truncate ${tema.btnText}`}>
-                {lider.nombres} {lider.apellidos}
-              </h3>
-              {isLoading && (
-                <Loader2 className={`w-3 h-3 animate-spin shrink-0 ${tema.btnText}`} />
-              )}
             </div>
           </div>
         </div>
